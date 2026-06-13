@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Robotic OT Tracker — CGH</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loading-overlay">
+  <div id="lo-spinner" class="spinner" style="width:28px;height:28px;border-width:3px"></div>
+  <div class="lo-title" id="lo-title">Connecting to Google Sheets...</div>
+  <div class="lo-sub" id="lo-sub">Loading instrument data</div>
+  <button class="btn lo-retry" id="lo-retry" style="display:none" onclick="retryLoad()">↻ Retry connection</button>
+</div>
+
+<div class="app">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sb-logo">
+      <div class="lt"><span class="dot" id="status-dot"></span>Robotic OT Tracker</div>
+      <div class="ls">CGH · da Vinci Programme</div>
+    </div>
+
+    <div class="nav-sec">Overview</div>
+    <button class="nav-item active" data-sec="dashboard" onclick="nav('dashboard')">
+      <span class="ni">⬡</span><span class="nl">Dashboard</span>
+    </button>
+
+    <div class="nav-sec">Instruments</div>
+    <button class="nav-item" data-sec="instruments" onclick="nav('instruments')">
+      <span class="ni">◈</span><span class="nl">All instruments</span>
+    </button>
+    <button class="nav-item" data-sec="consumables" onclick="nav('consumables')">
+      <span class="ni">◻</span><span class="nl">Consumables</span>
+    </button>
+
+    <div class="nav-sec">Actions</div>
+    <button class="nav-item" data-sec="log-use" onclick="nav('log-use')">
+      <span class="ni">+</span><span class="nl">Log use / fault</span>
+    </button>
+    <button class="nav-item" data-sec="manage" onclick="nav('manage')">
+      <span class="ni">⊕</span><span class="nl">Instrument management</span>
+    </button>
+    <button class="nav-item" id="nav-faults" data-sec="faults" onclick="nav('faults')">
+      <span class="ni">⚑</span><span class="nl">Fault log</span>
+    </button>
+    <button class="nav-item" data-sec="audit" onclick="nav('audit')">
+      <span class="ni">≡</span><span class="nl">Audit trail</span>
+    </button>
+
+    <div class="sb-foot">
+      <button onclick="refreshData()">↻ Refresh data</button>
+      <button onclick="exportAll()">↓ Export instruments CSV</button>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="main">
+    <div class="topbar">
+      <h1 id="page-title">Dashboard</h1>
+      <span class="sync-status loading" id="sync-status">Connecting...</span>
+      <span class="ts" id="clock"></span>
+    </div>
+
+    <div class="content">
+
+      <!-- Dashboard -->
+      <div id="sec-dashboard" class="section active">
+        <div class="stat-grid" id="dash-cards"></div>
+        <div class="dash-grid">
+          <div class="panel">
+            <div class="ph"><h2>⚠ Critical — ≤2 uses left</h2></div>
+            <div class="pb" id="dash-critical"></div>
+          </div>
+          <div class="panel">
+            <div class="ph"><h2>Recent faults</h2></div>
+            <div class="pb" id="dash-faults"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ph"><h2>Consumable stock levels</h2></div>
+          <div class="pb" id="dash-consumables"></div>
+        </div>
+      </div>
+
+      <!-- All Instruments -->
+      <div id="sec-instruments" class="section">
+        <div class="sh"><h1>All instruments</h1></div>
+        <div class="filter-row">
+          <select id="filt-type" onchange="renderInstruments()"><option value="">All types</option></select>
+          <select id="filt-status" onchange="renderInstruments()">
+            <option value="">All statuses</option>
+            <option>Circulation</option>
+            <option>SB Instrument</option>
+            <option>URO Set</option>
+            <option>Non-sterile</option>
+            <option>Complete</option>
+            <option>Condemned</option>
+          </select>
+        </div>
+        <div class="panel table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Serial number</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Life remaining</th>
+                <th>Last used</th>
+                <th>Remarks</th>
+              </tr>
+            </thead>
+            <tbody id="instr-table"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Consumables -->
+      <div id="sec-consumables" class="section">
+        <div class="sh"><h1>Consumables</h1></div>
+        <div class="panel">
+          <div class="ph"><h2>Clip applicators &amp; single-use stock</h2></div>
+          <div class="pb" id="cons-list"></div>
+        </div>
+      </div>
+
+      <!-- Log use / fault -->
+      <div id="sec-log-use" class="section">
+        <div class="sh"><h1>Log use / fault</h1></div>
+
+        <div class="panel-row">
+          <!-- Panel 1: Record instrument use -->
+          <div class="panel">
+            <div class="ph"><h2>Record instrument use</h2></div>
+            <div class="pb">
+              <div class="form-grid">
+                <div class="fg">
+                  <label>Instrument type</label>
+                  <select id="log-type" onchange="populateSNDropdown()"><option value="">Select type...</option></select>
+                </div>
+                <div class="fg">
+                  <label>Serial number</label>
+                  <select id="log-sn"><option value="">Select SN...</option></select>
+                </div>
+              </div>
+              <div class="form-grid">
+                <div class="fg"><label>Date used</label><input type="date" id="log-date"></div>
+                <div class="fg"><label>Staff name / ID</label><input type="text" id="log-staff" placeholder="e.g. Jim / S1234"></div>
+              </div>
+              <div class="fg" style="margin-bottom:14px">
+                <label>Case / procedure (optional)</label>
+                <input type="text" id="log-case" placeholder="e.g. Robotic prostatectomy, OT3">
+              </div>
+              <button class="btn primary" id="btn-log-use" onclick="logUse()">Record use</button>
+              <div id="log-msg"></div>
+            </div>
+          </div>
+
+          <!-- Panel 2: Record fault -->
+          <div class="panel">
+            <div class="ph"><h2>Record fault / incident</h2></div>
+            <div class="pb">
+              <div class="form-grid">
+                <div class="fg">
+                  <label>Instrument type</label>
+                  <select id="fault-type" onchange="populateFaultSN()"><option value="">Select type...</option></select>
+                </div>
+                <div class="fg">
+                  <label>Serial number</label>
+                  <select id="fault-sn"><option value="">Select SN...</option></select>
+                </div>
+              </div>
+              <div class="form-grid">
+                <div class="fg">
+                  <label>Fault type</label>
+                  <select id="fault-kind">
+                    <option value="">Select...</option>
+                    <option>Wire broken</option>
+                    <option>Wire frail</option>
+                    <option>Cannot grasp</option>
+                    <option>Cannot close</option>
+                    <option>Jaw unable to open</option>
+                    <option>Intra-op failure</option>
+                    <option>Call back</option>
+                    <option>Cannot fire (stapler)</option>
+                    <option>Display issue (lens)</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+                <div class="fg"><label>Date</label><input type="date" id="fault-date"></div>
+              </div>
+              <div class="fg" style="margin-bottom:10px">
+                <label>Notes</label>
+                <textarea id="fault-notes" placeholder="Describe what happened..."></textarea>
+              </div>
+              <div class="fg" style="margin-bottom:14px">
+                <label>Reported by</label>
+                <input type="text" id="fault-staff" placeholder="e.g. Jim / S1234">
+              </div>
+              <button class="btn danger" id="btn-log-fault" onclick="logFault()">Record fault</button>
+              <div id="fault-msg"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel 3: Undo a logged use -->
+        <div class="panel" style="border-color:#3a2a10">
+          <div class="ph" style="border-color:#3a2a10">
+            <h2 style="color:var(--amber)">↩ Undo a logged use (case cancelled / instrument returned unused)</h2>
+          </div>
+          <div class="pb">
+            <p style="font-size:12px;color:var(--text2);margin-bottom:14px">
+              Use this only when an instrument was logged by mistake or a case was cancelled before the instrument was actually used.
+              Every undo is permanently recorded in the audit trail.
+            </p>
+            <div class="form-grid">
+              <div class="fg">
+                <label>Instrument type</label>
+                <select id="undo-type" onchange="populateUndoSN()"><option value="">Select type...</option></select>
+              </div>
+              <div class="fg">
+                <label>Serial number</label>
+                <select id="undo-sn"><option value="">Select SN...</option></select>
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="fg">
+                <label>Reason</label>
+                <select id="undo-reason">
+                  <option value="">Select reason...</option>
+                  <option>Case cancelled</option>
+                  <option>Logged in error</option>
+                  <option>Wrong instrument selected</option>
+                  <option>Other</option>
+                </select>
+              </div>
+              <div class="fg">
+                <label>Authorised by (supervisor)</label>
+                <input type="text" id="undo-staff" placeholder="Supervisor name / ID">
+              </div>
+            </div>
+            <div class="fg" style="margin-bottom:14px">
+              <label>Additional notes (optional)</label>
+              <input type="text" id="undo-notes" placeholder="e.g. OT3 case cancelled by surgeon">
+            </div>
+            <button class="btn amber" id="btn-undo" onclick="undoUse()">↩ Undo use &amp; return instrument</button>
+            <div id="undo-msg"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Instrument Management -->
+      <div id="sec-manage" class="section">
+        <div class="sh"><h1>Instrument management</h1></div>
+
+        <div class="panel-row">
+          <!-- Panel 1: Add new instrument -->
+          <div class="panel">
+            <div class="ph"><h2>Add new instrument</h2></div>
+            <div class="pb">
+              <div class="form-grid">
+                <div class="fg">
+                  <label>Serial number</label>
+                  <input type="text" id="mnew-sn" placeholder="e.g. K19251017-0337">
+                </div>
+                <div class="fg">
+                  <label>Instrument type</label>
+                  <select id="mnew-type" onchange="autoFillMaxLife()"><option value="">Select type...</option></select>
+                </div>
+              </div>
+              <div class="form-grid">
+                <div class="fg">
+                  <label>Status</label>
+                  <select id="mnew-status">
+                    <option value="">Select status...</option>
+                    <option>Circulation</option>
+                    <option>SB Instrument</option>
+                    <option>URO Set</option>
+                    <option>Non-sterile</option>
+                  </select>
+                </div>
+                <div class="fg">
+                  <label>Max uses (auto-filled)</label>
+                  <input type="number" id="mnew-maxlife" placeholder="auto-filled" min="1" oninput="syncUsesLeft()">
+                </div>
+              </div>
+              <div class="form-grid">
+                <div class="fg">
+                  <label>Uses left (editable)</label>
+                  <input type="number" id="mnew-usesleft" placeholder="auto-filled" min="0">
+                </div>
+                <div class="fg">
+                  <label>Added by</label>
+                  <input type="text" id="mnew-staff" placeholder="Staff name / ID">
+                </div>
+              </div>
+              <div class="fg" style="margin-bottom:14px">
+                <label>Remarks (optional)</label>
+                <input type="text" id="mnew-remarks" placeholder="Any notes...">
+              </div>
+              <button class="btn primary" id="btn-add-instr" onclick="addInstrument()">Add instrument</button>
+              <div id="mnew-msg"></div>
+            </div>
+          </div>
+
+          <!-- Panel 2: Add new consumable -->
+          <div class="panel">
+            <div class="ph"><h2>Add new consumable</h2></div>
+            <div class="pb">
+              <div class="form-grid">
+                <div class="fg">
+                  <label>Serial number</label>
+                  <input type="text" id="mcon-sn" placeholder="e.g. K10250821-0010">
+                </div>
+                <div class="fg">
+                  <label>Type</label>
+                  <select id="mcon-type"><option value="">Select type...</option></select>
+                </div>
+              </div>
+              <div class="form-grid">
+                <div class="fg">
+                  <label>Balance</label>
+                  <input type="number" id="mcon-balance" placeholder="e.g. 50" min="0">
+                </div>
+                <div class="fg">
+                  <label>Max balance</label>
+                  <input type="number" id="mcon-maxbalance" placeholder="e.g. 100" min="1">
+                </div>
+              </div>
+              <div class="form-grid">
+                <div class="fg"><label>Expiry date</label><input type="date" id="mcon-expiry"></div>
+                <div class="fg"><label>Last used (optional)</label><input type="date" id="mcon-lastused"></div>
+              </div>
+              <div class="fg" style="margin-bottom:14px">
+                <label>Added by</label>
+                <input type="text" id="mcon-staff" placeholder="Staff name / ID">
+              </div>
+              <button class="btn primary" id="btn-add-cons" onclick="addConsumable()">Add consumable</button>
+              <div id="mcon-msg"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel 3: Retire / condemn instrument -->
+        <div class="panel" style="border-color:#3d1515">
+          <div class="ph" style="border-color:#3d1515">
+            <h2 style="color:var(--red)">⚑ Retire / condemn instrument — this action is permanent</h2>
+          </div>
+          <div class="pb">
+            <p style="font-size:12px;color:var(--text2);margin-bottom:14px">
+              Condemned instruments are permanently retired. They remain visible in All Instruments with a
+              <strong style="color:var(--red)">Condemned</strong> badge for audit purposes, but are excluded from
+              all action dropdowns. This cannot be undone.
+            </p>
+            <div class="form-grid">
+              <div class="fg">
+                <label>Instrument type</label>
+                <select id="mcnd-type" onchange="populateCondemnSN()"><option value="">Select type...</option></select>
+              </div>
+              <div class="fg">
+                <label>Serial number</label>
+                <select id="mcnd-sn"><option value="">Select SN...</option></select>
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="fg">
+                <label>Reason</label>
+                <select id="mcnd-reason">
+                  <option value="">Select reason...</option>
+                  <option>End of life — max uses reached</option>
+                  <option>Intra-op failure</option>
+                  <option>Physical damage</option>
+                  <option>Call back by vendor</option>
+                  <option>Other</option>
+                </select>
+              </div>
+              <div class="fg">
+                <label>Authorised by (supervisor)</label>
+                <input type="text" id="mcnd-staff" placeholder="Supervisor name / ID">
+              </div>
+            </div>
+            <div class="fg" style="margin-bottom:14px">
+              <label>Notes (optional)</label>
+              <input type="text" id="mcnd-notes" placeholder="Additional context...">
+            </div>
+            <button class="btn danger" id="btn-condemn" onclick="condemnInstrument()">⚑ Retire instrument</button>
+            <div id="mcnd-msg"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fault log -->
+      <div id="sec-faults" class="section">
+        <div class="sh"><h1>Fault log</h1></div>
+        <div class="filter-row">
+          <select id="ffilt-type" onchange="renderFaults()"><option value="">All types</option></select>
+          <select id="ffilt-kind" onchange="renderFaults()">
+            <option value="">All fault types</option>
+            <option>Wire broken</option>
+            <option>Wire frail</option>
+            <option>Cannot grasp</option>
+            <option>Cannot close</option>
+            <option>Jaw unable to open</option>
+            <option>Intra-op failure</option>
+            <option>Call back</option>
+            <option>Cannot fire (stapler)</option>
+            <option>Display issue (lens)</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="panel"><div class="pb" id="fault-list"></div></div>
+      </div>
+
+      <!-- Audit trail -->
+      <div id="sec-audit" class="section">
+        <div class="sh">
+          <h1>Audit trail</h1>
+          <button class="btn sm" onclick="exportAudit()">↓ Export CSV</button>
+        </div>
+        <div class="panel table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Event</th>
+                <th>Type</th>
+                <th>SN</th>
+                <th>Staff</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="audit-table"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /.content -->
+  </div><!-- /.main -->
+</div><!-- /.app -->
+
+<!-- Mobile bottom navigation -->
+<nav class="bottom-nav" id="bottom-nav">
+  <button class="bn-item active" data-sec="dashboard" onclick="nav('dashboard')">
+    <span class="bn-icon">⬡</span><span>Dashboard</span>
+  </button>
+  <button class="bn-item" data-sec="instruments" onclick="nav('instruments')">
+    <span class="bn-icon">◈</span><span>Instruments</span>
+  </button>
+  <button class="bn-item" data-sec="log-use" onclick="nav('log-use')">
+    <span class="bn-icon">+</span><span>Log use</span>
+  </button>
+  <button class="bn-item" data-sec="manage" onclick="nav('manage')">
+    <span class="bn-icon">⊕</span><span>Manage</span>
+  </button>
+  <button class="bn-item" data-sec="faults" onclick="nav('faults')">
+    <span class="bn-icon">⚑</span><span>Faults</span>
+  </button>
+  <button class="bn-item" data-sec="audit" onclick="nav('audit')">
+    <span class="bn-icon">≡</span><span>Audit</span>
+  </button>
+</nav>
+
+<script src="js/app.js"></script>
+</body>
+</html>
