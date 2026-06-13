@@ -1,7 +1,7 @@
 <img width="1799" height="919" alt="RobotTrack" src="https://github.com/user-attachments/assets/aa5f0e51-0821-4922-817d-13c325a15033" />
 # Robotic OT Tracker
 
-A web-based instrument lifecycle tracking system for the da Vinci robotic surgery programme at **Changi General Hospital (CGH)**. Replaces a manual Excel spreadsheet used by scrub nurses and OT supervisors to manage reusable robotic instrument lifecycles, consumable stock, and fault reporting.
+A web-based instrument lifecycle tracking system for the robotic surgery. Replaces a manual Excel spreadsheet used by scrub nurses and OT supervisors to manage reusable robotic instrument lifecycles, consumable stock, and fault reporting.
 
 > **Portfolio project** — demonstrates clinical informatics applied to real operating theatre workflows.
 
