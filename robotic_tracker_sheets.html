@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Robotic Instrument Tracker — CGH</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f1117;--bg2:#181c27;--bg3:#1e2335;--bg4:#252b3d;--border:#2e3650;--border2:#3a4260;--text:#e8ecf4;--text2:#8b93ab;--text3:#5a6282;--accent:#4f8ef7;--accent2:#3a6fd4;--green:#34c98a;--green-bg:#0d2e1f;--amber:#f0a742;--amber-bg:#2d1f08;--red:#f05555;--red-bg:#2d0e0e;--blue-bg:#0d1e3a;--mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;--r:8px;--rl:12px}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;display:flex;flex-direction:column;min-height:100vh}
+.app{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:220px;min-width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.sb-logo{padding:20px 18px 16px;border-bottom:1px solid var(--border)}
+.sb-logo .lt{font-size:13px;font-weight:600;color:var(--text);letter-spacing:.02em}
+.sb-logo .ls{font-size:11px;color:var(--text3);margin-top:2px;font-family:var(--mono)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px;box-shadow:0 0 6px var(--green)}
+.dot.amber{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+.dot.red{background:var(--red);box-shadow:0 0 6px var(--red)}
+.nav-sec{padding:12px 10px 4px;font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.08em;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 12px;margin:1px 8px;border-radius:var(--r);cursor:pointer;font-size:13px;color:var(--text2);transition:all .15s;border:none;background:none;width:calc(100% - 16px);text-align:left;font-family:var(--sans)}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:var(--bg3);color:var(--accent);font-weight:500}
+.ni{font-size:15px;width:18px;text-align:center}
+.nbadge{margin-left:auto;font-size:10px;background:var(--red-bg);color:var(--red);padding:1px 6px;border-radius:20px;font-weight:600}
+.sb-foot{margin-top:auto;padding:12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px}
+.sb-foot button{width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text2);font-size:12px;cursor:pointer;font-family:var(--sans);transition:all .15s}
+.sb-foot button:hover{border-color:var(--accent);color:var(--accent)}
+.main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+.topbar h1{font-size:15px;font-weight:500;flex:1}
+.ts{font-size:11px;color:var(--text3);font-family:var(--mono)}
+.sync-status{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500}
+.sync-status.ok{background:var(--green-bg);color:var(--green)}
+.sync-status.loading{background:var(--amber-bg);color:var(--amber)}
+.sync-status.err{background:var(--red-bg);color:var(--red)}
+.content{padding:24px;flex:1}
+.section{display:none}.section.active{display:block}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px}
+.sc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:16px;transition:border-color .15s}
+.sc:hover{border-color:var(--border2)}
+.sc-lbl{font-size:11px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
+.sc-num{font-size:28px;font-weight:300;color:var(--text);font-family:var(--mono)}
+.sc.danger{border-color:#3d1515}.sc.danger .sc-num{color:var(--red)}
+.sc.ok .sc-num{color:var(--green)}.sc.warn .sc-num{color:var(--amber)}.sc.info .sc-num{color:var(--accent)}
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:16px;overflow:hidden}
+.ph{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.ph h2{font-size:13px;font-weight:500;color:var(--text)}
+.pb{padding:16px 18px}
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+table{width:100%;border-collapse:collapse}
+th{padding:10px 16px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;text-align:left;border-bottom:1px solid var(--border);background:var(--bg2)}
+td{padding:10px 16px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg3)}
+.mono{font-family:var(--mono);font-size:12px}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap}
+.badge.green{background:var(--green-bg);color:var(--green)}
+.badge.red{background:var(--red-bg);color:var(--red)}
+.badge.amber{background:var(--amber-bg);color:var(--amber)}
+.badge.blue{background:var(--blue-bg);color:var(--accent)}
+.badge.gray{background:var(--bg4);color:var(--text2)}
+.lw{display:flex;align-items:center;gap:10px}
+.lb{height:5px;border-radius:3px;background:var(--bg4);min-width:70px;overflow:hidden}
+.lf{height:100%;border-radius:3px}
+.ll{font-family:var(--mono);font-size:11px;font-weight:500;min-width:36px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.fg{display:flex;flex-direction:column;gap:5px}
+.fg label{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em}
+input,select,textarea{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);padding:8px 12px;font-size:13px;font-family:var(--sans);width:100%;outline:none;transition:border-color .15s}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+select option{background:var(--bg3)}
+textarea{resize:vertical;min-height:72px}
+.btn{padding:9px 18px;border-radius:var(--r);font-size:13px;font-weight:500;cursor:pointer;font-family:var(--sans);border:1px solid var(--border2);background:var(--bg3);color:var(--text);transition:all .15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent2);border-color:var(--accent2)}
+.btn.danger{border-color:var(--red);color:var(--red);background:var(--red-bg)}
+.btn.danger:hover{background:#3d1515}
+.btn.sm{padding:5px 12px;font-size:12px}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+.filter-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.filter-row select{width:auto;font-size:12px;padding:6px 10px}
+.fi{padding:12px 0;border-bottom:1px solid var(--border)}
+.fi:last-child{border-bottom:none}
+.fi-top{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap}
+.fi-sn{font-family:var(--mono);font-size:12px;font-weight:500}
+.fi-date{font-family:var(--mono);font-size:11px;color:var(--text3);margin-left:auto}
+.fi-note{font-size:12px;color:var(--text2)}
+.ci{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.ci:last-child{border-bottom:none}
+.ci-info{min-width:190px}
+.ci-sn{font-family:var(--mono);font-size:12px;font-weight:500}
+.ci-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.ci-bar{flex:1;height:6px;border-radius:3px;background:var(--bg4);overflow:hidden}
+.ci-fill{height:100%;border-radius:3px}
+.ci-pct{font-family:var(--mono);font-size:12px;font-weight:500;min-width:52px;text-align:right}
+.msg{margin-top:10px;font-size:13px;padding:8px 12px;border-radius:var(--r)}
+.msg.ok{background:var(--green-bg);color:var(--green)}
+.msg.err{background:var(--red-bg);color:var(--red)}
+.msg.warn{background:var(--amber-bg);color:var(--amber)}
+.empty{text-align:center;padding:32px;color:var(--text3);font-size:13px}
+.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.sh h1{font-size:16px;font-weight:500}
+.crit-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.crit-item:last-child{border-bottom:none}
+.crit-sn{font-family:var(--mono);font-size:12px;font-weight:500;flex:1}
+.crit-type{font-size:11px;color:var(--text3)}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-overlay{position:fixed;inset:0;background:rgba(15,17,23,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;gap:16px}
+.loading-overlay .lo-title{font-size:15px;font-weight:500}
+.loading-overlay .lo-sub{font-size:12px;color:var(--text3)}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+@media(max-width:768px){.sidebar{display:none}.dash-grid{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner" style="width:28px;height:28px;border-width:3px"></div>
+  <div class="lo-title">Connecting to Google Sheets...</div>
+  <div class="lo-sub" id="loading-sub">Loading instrument data</div>
+</div>
+
+<div class="app">
+<div class="sidebar">
+  <div class="sb-logo">
+    <div class="lt"><span class="dot" id="status-dot"></span>Robotic OT Tracker</div>
+    <div class="ls">CGH · da Vinci Programme</div>
+  </div>
+  <div class="nav-sec">Overview</div>
+  <button class="nav-item active" onclick="nav('dashboard',this)"><span class="ni">⬡</span>Dashboard</button>
+  <div class="nav-sec">Instruments</div>
+  <button class="nav-item" onclick="nav('instruments',this)"><span class="ni">◈</span>All instruments</button>
+  <button class="nav-item" onclick="nav('consumables',this)"><span class="ni">◻</span>Consumables</button>
+  <div class="nav-sec">Actions</div>
+  <button class="nav-item" onclick="nav('log-use',this)"><span class="ni">+</span>Log use / fault</button>
+  <button class="nav-item" id="nav-faults" onclick="nav('faults',this)"><span class="ni">!</span>Fault log</button>
+  <button class="nav-item" onclick="nav('audit',this)"><span class="ni">≡</span>Audit trail</button>
+  <div class="sb-foot">
+    <button onclick="refreshData()">↻ Refresh data</button>
+    <button onclick="exportAll()">↓ Export instruments CSV</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <h1 id="page-title">Dashboard</h1>
+    <span class="sync-status loading" id="sync-status">Connecting...</span>
+    <span class="ts" id="clock"></span>
+  </div>
+  <div class="content">
+
+    <div id="sec-dashboard" class="section active">
+      <div class="stat-grid" id="dash-cards"></div>
+      <div class="dash-grid">
+        <div class="panel"><div class="ph"><h2>⚠ Critical — ≤2 uses left</h2></div><div class="pb" id="dash-critical"></div></div>
+        <div class="panel"><div class="ph"><h2>Recent faults</h2></div><div class="pb" id="dash-faults"></div></div>
+      </div>
+      <div class="panel"><div class="ph"><h2>Consumable stock levels</h2></div><div class="pb" id="dash-consumables"></div></div>
+    </div>
+
+    <div id="sec-instruments" class="section">
+      <div class="sh"><h1>All instruments</h1></div>
+      <div class="filter-row">
+        <select id="filt-type" onchange="renderInstruments()"><option value="">All types</option></select>
+        <select id="filt-status" onchange="renderInstruments()"><option value="">All statuses</option><option>Circulation</option><option>SB Instrument</option><option>URO Set</option><option>Non-sterile</option><option>Complete</option></select>
+      </div>
+      <div class="panel" style="padding:0"><table><thead><tr><th>Serial number</th><th>Type</th><th>Status</th><th>Life remaining</th><th>Last used</th><th>Remarks</th></tr></thead><tbody id="instr-table"></tbody></table></div>
+    </div>
+
+    <div id="sec-consumables" class="section">
+      <div class="sh"><h1>Consumables</h1></div>
+      <div class="panel"><div class="ph"><h2>Clip applicators &amp; single-use stock</h2></div><div class="pb" id="cons-list"></div></div>
+    </div>
+
+    <div id="sec-log-use" class="section">
+      <div class="sh"><h1>Log use / fault</h1></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="panel">
+          <div class="ph"><h2>Record instrument use</h2></div>
+          <div class="pb">
+            <div class="form-grid">
+              <div class="fg"><label>Instrument type</label><select id="log-type" onchange="populateSNDropdown()"><option value="">Select type...</option></select></div>
+              <div class="fg"><label>Serial number</label><select id="log-sn"><option value="">Select SN...</option></select></div>
+            </div>
+            <div class="form-grid">
+              <div class="fg"><label>Date used</label><input type="date" id="log-date"></div>
+              <div class="fg"><label>Staff name / ID</label><input type="text" id="log-staff" placeholder="e.g. Jim / S1234"></div>
+            </div>
+            <div class="fg" style="margin-bottom:14px"><label>Case / procedure (optional)</label><input type="text" id="log-case" placeholder="e.g. Robotic prostatectomy, OT3"></div>
+            <button class="btn primary" id="btn-log-use" onclick="logUse()">Record use</button>
+            <div id="log-msg"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ph"><h2>Record fault / incident</h2></div>
+          <div class="pb">
+            <div class="form-grid">
+              <div class="fg"><label>Instrument type</label><select id="fault-type" onchange="populateFaultSN()"><option value="">Select type...</option></select></div>
+              <div class="fg"><label>Serial number</label><select id="fault-sn"><option value="">Select SN...</option></select></div>
+            </div>
+            <div class="form-grid">
+              <div class="fg"><label>Fault type</label><select id="fault-kind"><option value="">Select...</option><option>Wire broken</option><option>Wire frail</option><option>Cannot grasp</option><option>Cannot close</option><option>Jaw unable to open</option><option>Intra-op failure</option><option>Call back</option><option>Cannot fire (stapler)</option><option>Display issue (lens)</option><option>Other</option></select></div>
+              <div class="fg"><label>Date</label><input type="date" id="fault-date"></div>
+            </div>
+            <div class="fg" style="margin-bottom:10px"><label>Notes</label><textarea id="fault-notes" placeholder="Describe what happened..."></textarea></div>
+            <div class="fg" style="margin-bottom:14px"><label>Reported by</label><input type="text" id="fault-staff" placeholder="e.g. Jim / S1234"></div>
+            <button class="btn danger" id="btn-log-fault" onclick="logFault()">Record fault</button>
+            <div id="fault-msg"></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:16px;border-color:#3a2a10">
+        <div class="ph" style="border-color:#3a2a10"><h2 style="color:#f0a742">↩ Undo a logged use (case cancelled / instrument returned unused)</h2></div>
+        <div class="pb">
+          <p style="font-size:12px;color:#8b93ab;margin-bottom:14px">Use this only when an instrument was logged by mistake or a case was cancelled before the instrument was actually used. Every undo is permanently recorded in the audit trail.</p>
+          <div class="form-grid">
+            <div class="fg"><label>Instrument type</label><select id="undo-type" onchange="populateUndoSN()"><option value="">Select type...</option></select></div>
+            <div class="fg"><label>Serial number</label><select id="undo-sn"><option value="">Select SN...</option></select></div>
+          </div>
+          <div class="form-grid">
+            <div class="fg"><label>Reason</label><select id="undo-reason"><option value="">Select reason...</option><option>Case cancelled</option><option>Logged in error</option><option>Wrong instrument selected</option><option>Other</option></select></div>
+            <div class="fg"><label>Authorised by (supervisor)</label><input type="text" id="undo-staff" placeholder="Supervisor name / ID"></div>
+          </div>
+          <div class="fg" style="margin-bottom:14px"><label>Additional notes (optional)</label><input type="text" id="undo-notes" placeholder="e.g. OT3 case cancelled by surgeon"></div>
+          <button class="btn" id="btn-undo" style="border-color:#f0a742;color:#f0a742;background:#2d1f08" onclick="undoUse()">↩ Undo use &amp; return instrument</button>
+          <div id="undo-msg"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="sec-faults" class="section">
+      <div class="sh"><h1>Fault log</h1></div>
+      <div class="filter-row">
+        <select id="ffilt-type" onchange="renderFaults()"><option value="">All types</option></select>
+        <select id="ffilt-kind" onchange="renderFaults()"><option value="">All fault types</option><option>Wire broken</option><option>Wire frail</option><option>Cannot grasp</option><option>Cannot close</option><option>Jaw unable to open</option><option>Intra-op failure</option><option>Call back</option><option>Cannot fire (stapler)</option><option>Display issue (lens)</option><option>Other</option></select>
+      </div>
+      <div class="panel"><div class="pb" id="fault-list"></div></div>
+    </div>
+
+    <div id="sec-audit" class="section">
+      <div class="sh"><h1>Audit trail</h1><button class="btn sm" onclick="exportAudit()">↓ Export CSV</button></div>
+      <div class="panel" style="padding:0"><table><thead><tr><th>Timestamp</th><th>Event</th><th>Type</th><th>SN</th><th>Staff</th><th>Notes</th></tr></thead><tbody id="audit-table"></tbody></table></div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxS4JCzH1GvZu_sO4CsndHcqka0-Z9DhuZIy8fBHj1X7vtiy75cISQpDvHNFPK3UyN7/exec';
+
+const SEED_INSTRUMENTS = [
+  {SN:'K19251017-0337',Type:'Monopolar scissors',Status:'Circulation',UsesLeft:9,MaxLife:10,LastUsed:'2026-04-05',Remarks:''},
+  {SN:'K19251017-0328',Type:'Monopolar scissors',Status:'Circulation',UsesLeft:8,MaxLife:10,LastUsed:'2026-04-03',Remarks:''},
+  {SN:'k10251215-0449',Type:'Monopolar scissors',Status:'SB Instrument',UsesLeft:10,MaxLife:10,LastUsed:'',Remarks:''},
+  {SN:'k19251017-0339',Type:'Monopolar scissors',Status:'Circulation',UsesLeft:9,MaxLife:10,LastUsed:'2025-11-28',Remarks:''},
+  {SN:'k19251017-0336',Type:'Monopolar scissors',Status:'Circulation',UsesLeft:5,MaxLife:10,LastUsed:'2026-04-27',Remarks:''},
+  {SN:'k19250925-0440',Type:'Monopolar scissors',Status:'Circulation',UsesLeft:2,MaxLife:10,LastUsed:'2026-05-19',Remarks:''},
+  {SN:'k10251215-0440',Type:'Monopolar scissors',Status:'Non-sterile',UsesLeft:10,MaxLife:10,LastUsed:'',Remarks:''},
+  {SN:'k10251215-0447',Type:'Monopolar scissors',Status:'Non-sterile',UsesLeft:10,MaxLife:10,LastUsed:'',Remarks:''},
+  {SN:'K19250925-0432',Type:'Monopolar scissors',Status:'Complete',UsesLeft:0,MaxLife:10,LastUsed:'2026-02-11',Remarks:'Jaw unable to open on 11/02/2026'},
+  {SN:'K10250116-0498',Type:'Monopolar scissors',Status:'Complete',UsesLeft:0,MaxLife:10,LastUsed:'2025-12-17',Remarks:'Wire broken 17/12/2025'},
+  {SN:'K17251014-0158',Type:'Fenestrated bipolar',Status:'Circulation',UsesLeft:6,MaxLife:14,LastUsed:'2026-04-22',Remarks:''},
+  {SN:'k12250731-0251',Type:'Fenestrated bipolar',Status:'Circulation',UsesLeft:3,MaxLife:14,LastUsed:'2026-05-14',Remarks:''},
+  {SN:'k17251014-0219',Type:'Fenestrated bipolar',Status:'SB Instrument',UsesLeft:13,MaxLife:14,LastUsed:'2026-04-25',Remarks:''},
+  {SN:'K17251014-0170',Type:'Fenestrated bipolar',Status:'SB Instrument',UsesLeft:13,MaxLife:14,LastUsed:'2026-05-21',Remarks:''},
+  {SN:'K17251014-0129',Type:'Fenestrated bipolar',Status:'Non-sterile',UsesLeft:14,MaxLife:14,LastUsed:'',Remarks:''},
+  {SN:'K12241003-0159',Type:'Fenestrated bipolar',Status:'Complete',UsesLeft:0,MaxLife:14,LastUsed:'2025-07-24',Remarks:'Faulty — not grasping well'},
+  {SN:'k102502026-0048',Type:'Cadiere forceps',Status:'Circulation',UsesLeft:12,MaxLife:18,LastUsed:'2026-04-01',Remarks:''},
+  {SN:'K11250522-0014',Type:'Cadiere forceps',Status:'Circulation',UsesLeft:16,MaxLife:18,LastUsed:'2026-04-26',Remarks:''},
+  {SN:'K10250424-0053',Type:'Cadiere forceps',Status:'SB Instrument',UsesLeft:16,MaxLife:18,LastUsed:'2026-04-28',Remarks:''},
+  {SN:'K10250109-0481',Type:'Cadiere forceps',Status:'Non-sterile',UsesLeft:18,MaxLife:18,LastUsed:'',Remarks:''},
+  {SN:'K 10250109-0490',Type:'Cadiere forceps',Status:'Complete',UsesLeft:0,MaxLife:18,LastUsed:'2026-04-01',Remarks:'Unable to recognise during docking'},
+  {SN:'K10251120_0364',Type:'Maryland forceps',Status:'Circulation',UsesLeft:12,MaxLife:14,LastUsed:'2026-03-24',Remarks:''},
+  {SN:'k12251106-0100',Type:'Maryland forceps',Status:'Circulation',UsesLeft:7,MaxLife:14,LastUsed:'2026-02-24',Remarks:''},
+  {SN:'K10251002-0445',Type:'Maryland forceps',Status:'Complete',UsesLeft:0,MaxLife:14,LastUsed:'2026-02-27',Remarks:'Wire broken 27/02/2026'},
+  {SN:'K10241107-0333',Type:'Maryland forceps',Status:'Complete',UsesLeft:0,MaxLife:14,LastUsed:'2026-01-22',Remarks:'Call back instrument 13/14'},
+  {SN:'K10241107-0340',Type:'Maryland forceps',Status:'Complete',UsesLeft:0,MaxLife:14,LastUsed:'2025-09-05',Remarks:'Wire broken intra-op'},
+  {SN:'N11210607-0185',Type:'Prograsp forceps',Status:'Circulation',UsesLeft:6,MaxLife:18,LastUsed:'2026-04-16',Remarks:''},
+  {SN:'k13220221-0204',Type:'Prograsp forceps',Status:'Circulation',UsesLeft:11,MaxLife:18,LastUsed:'2026-04-29',Remarks:''},
+  {SN:'K10251106-0220',Type:'Prograsp forceps',Status:'SB Instrument',UsesLeft:18,MaxLife:18,LastUsed:'',Remarks:''},
+  {SN:'K11250807-0013',Type:'Prograsp forceps',Status:'URO Set',UsesLeft:13,MaxLife:18,LastUsed:'2026-04-13',Remarks:''},
+  {SN:'k13230706-0370',Type:'Prograsp forceps',Status:'Complete',UsesLeft:0,MaxLife:18,LastUsed:'2025-09-15',Remarks:'Wire frail post-op'},
+  {SN:'K10230608-0421',Type:'Curved bipolar dissector',Status:'Circulation',UsesLeft:11,MaxLife:14,LastUsed:'2026-02-27',Remarks:''},
+  {SN:'k10240829-0031',Type:'Curved bipolar dissector',Status:'Circulation',UsesLeft:13,MaxLife:14,LastUsed:'2025-09-17',Remarks:''},
+  {SN:'K10240118-0086',Type:'Curved bipolar dissector',Status:'Non-sterile',UsesLeft:14,MaxLife:14,LastUsed:'',Remarks:''},
+  {SN:'K14251030-0113',Type:'Large needle driver',Status:'Circulation',UsesLeft:13,MaxLife:15,LastUsed:'2026-04-28',Remarks:'Dr Annalisa — monitor grasping'},
+  {SN:'K10250204-0268',Type:'Large needle driver',Status:'Circulation',UsesLeft:7,MaxLife:15,LastUsed:'2026-01-20',Remarks:''},
+  {SN:'K10251009-0107',Type:'Large needle driver',Status:'Complete',UsesLeft:0,MaxLife:15,LastUsed:'2026-04-23',Remarks:'Dr Annalisa — cannot swivel, CRC raised'},
+  {SN:'k12241227-0484',Type:'Large needle driver',Status:'Complete',UsesLeft:1,MaxLife:15,LastUsed:'2026-04-13',Remarks:'Wire broken intra-op'},
+  {SN:'K10251016-0272',Type:'Large suturecut needle driver',Status:'Circulation',UsesLeft:10,MaxLife:15,LastUsed:'2026-02-27',Remarks:''},
+  {SN:'K10251016-0286',Type:'Large suturecut needle driver',Status:'Circulation',UsesLeft:13,MaxLife:15,LastUsed:'2026-02-26',Remarks:''},
+  {SN:'k10240314-0070',Type:'Large suturecut needle driver',Status:'Complete',UsesLeft:0,MaxLife:15,LastUsed:'2026-01-30',Remarks:'Call back instrument'},
+  {SN:'s10101021-0041',Type:'Cautery hook',Status:'Circulation',UsesLeft:2,MaxLife:10,LastUsed:'2026-05-28',Remarks:''},
+  {SN:'s10161021-0036',Type:'Cautery hook',Status:'Circulation',UsesLeft:2,MaxLife:10,LastUsed:'2026-04-23',Remarks:''},
+  {SN:'k14240606-0184',Type:'Cautery hook',Status:'Non-sterile',UsesLeft:10,MaxLife:10,LastUsed:'',Remarks:''},
+  {SN:'S10150306-0004',Type:'Cautery spatula',Status:'Circulation',UsesLeft:4,MaxLife:10,LastUsed:'2025-12-19',Remarks:''},
+  {SN:'N10171026-0087',Type:'Cautery spatula',Status:'Circulation',UsesLeft:9,MaxLife:10,LastUsed:'2026-01-05',Remarks:''},
+  {SN:'N10160929-0076',Type:'Fenestrated TIP-UP',Status:'Circulation',UsesLeft:2,MaxLife:10,LastUsed:'2026-04-25',Remarks:''},
+  {SN:'S10160405-0024',Type:'Fenestrated TIP-UP',Status:'Circulation',UsesLeft:10,MaxLife:10,LastUsed:'',Remarks:''},
+  {SN:'001030-3865',Type:'0 degree lens',Status:'Circulation',UsesLeft:null,MaxLife:null,LastUsed:'2026-04-22',Remarks:''},
+  {SN:'001007-6207',Type:'0 degree lens',Status:'Circulation',UsesLeft:null,MaxLife:null,LastUsed:'2026-04-15',Remarks:''},
+  {SN:'001028-0444',Type:'0 degree lens',Status:'Circulation',UsesLeft:null,MaxLife:null,LastUsed:'2026-04-29',Remarks:''},
+  {SN:'SF 0000151-2034',Type:'30 degree lens',Status:'Circulation',UsesLeft:null,MaxLife:null,LastUsed:'2026-03-26',Remarks:'Hot spot on screen — vendor notified, monitoring'},
+  {SN:'SF 0000151-1032',Type:'30 degree lens',Status:'Circulation',UsesLeft:null,MaxLife:null,LastUsed:'2026-03-24',Remarks:''},
+];
+
+const SEED_CONSUMABLES = [
+  {SN:'K10250821-0010',Type:'Small clip applicator',Balance:98,MaxBalance:100,Expiry:'',LastUsed:'2025-11-14'},
+  {SN:'K10240327-0210',Type:'Small clip applicator',Balance:68,MaxBalance:100,Expiry:'',LastUsed:'2025-11-14'},
+  {SN:'K10240411-0237',Type:'Small clip applicator',Balance:69,MaxBalance:100,Expiry:'',LastUsed:'2025-10-17'},
+  {SN:'N10170123-0078',Type:'M/L clip applicator',Balance:35,MaxBalance:100,Expiry:'',LastUsed:'2026-02-19'},
+  {SN:'N10170123-0103',Type:'M/L clip applicator',Balance:47,MaxBalance:100,Expiry:'',LastUsed:'2026-04-24'},
+  {SN:'N10170123-0076',Type:'M/L clip applicator',Balance:84,MaxBalance:100,Expiry:'',LastUsed:'2026-04-16'},
+  {SN:'S10140906-0046',Type:'Large clip applicator',Balance:22,MaxBalance:100,Expiry:'',LastUsed:'2026-05-28'},
+  {SN:'S10160109-0024',Type:'Large clip applicator',Balance:42,MaxBalance:100,Expiry:'',LastUsed:'2026-05-28'},
+  {SN:'S10160816-0094',Type:'Large clip applicator',Balance:96,MaxBalance:100,Expiry:'',LastUsed:'2026-03-26'},
+  {SN:'K18251108-0161',Type:'Vessel sealer',Balance:1,MaxBalance:1,Expiry:'2026-12-31',LastUsed:''},
+  {SN:'K18251108-0158',Type:'Vessel sealer',Balance:0,MaxBalance:1,Expiry:'2026-12-31',LastUsed:'2026-05-28'},
+  {SN:'K15240912-0583',Type:'Sureform 60',Balance:1,MaxBalance:1,Expiry:'2026-09-30',LastUsed:''},
+  {SN:'K15240912-0486',Type:'Sureform 60',Balance:1,MaxBalance:1,Expiry:'2026-09-30',LastUsed:''},
+  {SN:'K15240912-0564',Type:'Sureform 60',Balance:1,MaxBalance:1,Expiry:'2026-09-30',LastUsed:''},
+  {SN:'K12250717-0240',Type:'SureForm 45',Balance:1,MaxBalance:1,Expiry:'2026-06-20',LastUsed:''},
+  {SN:'K12250717-0237',Type:'SureForm 45',Balance:1,MaxBalance:1,Expiry:'2026-06-20',LastUsed:''},
+  {SN:'K10250908-0043',Type:'Harmonic scalpel',Balance:0,MaxBalance:1,Expiry:'2028-09-30',LastUsed:'2026-01-30'},
+  {SN:'K10250908-0021',Type:'Harmonic scalpel',Balance:0,MaxBalance:1,Expiry:'2028-09-30',LastUsed:'2026-01-22'},
+];
+
+const SEED_FAULTS = [
+  {ID:'f1',Date:'2026-02-11',Type:'Monopolar scissors',SN:'K19250925-0432',Kind:'Jaw unable to open',Notes:'Jaw unable to open intra-op',Staff:''},
+  {ID:'f2',Date:'2025-12-17',Type:'Monopolar scissors',SN:'K10250116-0498',Kind:'Wire broken',Notes:'Wire broken 17/12/2025',Staff:''},
+  {ID:'f3',Date:'2026-02-27',Type:'Maryland forceps',SN:'K10251002-0445',Kind:'Wire broken',Notes:'Wire broken 27/02/2026',Staff:''},
+  {ID:'f4',Date:'2025-09-05',Type:'Maryland forceps',SN:'K10241107-0340',Kind:'Intra-op failure',Notes:'Wire broken intra-op',Staff:''},
+  {ID:'f5',Date:'2026-04-23',Type:'Large needle driver',SN:'K10251009-0107',Kind:'Cannot grasp',Notes:'Dr Annalisa complaint — cannot swivel properly, CRC raised',Staff:''},
+  {ID:'f6',Date:'2026-04-13',Type:'Large needle driver',SN:'k12241227-0484',Kind:'Wire broken',Notes:'Wire broken intra-op',Staff:''},
+  {ID:'f7',Date:'2025-09-15',Type:'Prograsp forceps',SN:'k13230706-0370',Kind:'Wire frail',Notes:'Wire frail post-op',Staff:''},
+  {ID:'f8',Date:'2026-03-26',Type:'30 degree lens',SN:'SF 0000151-2034',Kind:'Display issue (lens)',Notes:'Hot spot visible on screen — vendor notified, monitoring',Staff:''},
+  {ID:'f9',Date:'2026-04-01',Type:'Cadiere forceps',SN:'K 10250109-0490',Kind:'Other',Notes:'Unable to recognise during docking',Staff:''},
+  {ID:'f10',Date:'2026-01-30',Type:'Large suturecut needle driver',SN:'k10240314-0070',Kind:'Call back',Notes:'Call back instrument',Staff:''},
+];
+
+let state = { instruments:[], consumables:[], faults:[], audit:[] };
+let syncing = false;
+
+async function api(params) {
+  const url = SCRIPT_URL + '?t=' + Date.now();
+  const res = await fetch(url, {
+    method: 'POST',
+    body: JSON.stringify(params),
+    headers: { 'Content-Type': 'text/plain' }
+  });
+  return res.json();
+}
+
+function setSyncStatus(status, text) {
+  const el = document.getElementById('sync-status');
+  const dot = document.getElementById('status-dot');
+  el.className = 'sync-status ' + status;
+  el.textContent = text;
+  dot.className = 'dot' + (status === 'ok' ? '' : status === 'loading' ? ' amber' : ' red');
+}
+
+async function refreshData() {
+  setSyncStatus('loading', 'Syncing...');
+  try {
+    const data = await api({ action: 'getAll' });
+    if (data.error) throw new Error(data.error);
+    state.instruments = (data.instruments || []).map(normaliseInstrument);
+    state.consumables = (data.consumables || []).map(normaliseConsumable);
+    state.faults = data.faults || [];
+    state.audit = data.audit || [];
+    setSyncStatus('ok', 'Synced · ' + new Date().toLocaleTimeString('en-SG',{hour:'2-digit',minute:'2-digit'}));
+    rerenderCurrentSection();
+  } catch(e) {
+    setSyncStatus('err', 'Sync failed');
+    console.error(e);
+  }
+}
+
+function normaliseInstrument(r) {
+  return {
+    sn: r.SN || r.sn || '',
+    type: r.Type || r.type || '',
+    status: r.Status || r.status || '',
+    usesLeft: r.UsesLeft === null || r.UsesLeft === '' ? null : Number(r.UsesLeft),
+    maxLife: r.MaxLife === null || r.MaxLife === '' ? null : Number(r.MaxLife),
+    lastUsed: r.LastUsed || r.lastUsed || '',
+    remarks: r.Remarks || r.remarks || '',
+  };
+}
+
+function normaliseConsumable(r) {
+  return {
+    sn: r.SN || r.sn || '',
+    type: r.Type || r.type || '',
+    balance: Number(r.Balance ?? r.balance ?? 0),
+    maxBalance: Number(r.MaxBalance ?? r.maxBalance ?? 1),
+    expiry: r.Expiry || r.expiry || '',
+    lastUsed: r.LastUsed || r.lastUsed || '',
+  };
+}
+
+async function initSheetData() {
+  document.getElementById('loading-sub').textContent = 'Checking if Sheet is empty...';
+  try {
+    const check = await api({ action: 'getAll' });
+    if (!check.error && check.instruments && check.instruments.length > 0) {
+      state.instruments = check.instruments.map(normaliseInstrument);
+      state.consumables = (check.consumables||[]).map(normaliseConsumable);
+      state.faults = check.faults || [];
+      state.audit = check.audit || [];
+      return;
+    }
+    document.getElementById('loading-sub').textContent = 'Loading seed data into Sheet...';
+    await api({ action: 'init', instruments: SEED_INSTRUMENTS, consumables: SEED_CONSUMABLES });
+    // Load faults one by one
+    for (const f of SEED_FAULTS) {
+      await api({ action: 'saveFault', ...f });
+    }
+    document.getElementById('loading-sub').textContent = 'Refreshing...';
+    const data = await api({ action: 'getAll' });
+    state.instruments = (data.instruments||[]).map(normaliseInstrument);
+    state.consumables = (data.consumables||[]).map(normaliseConsumable);
+    state.faults = data.faults || [];
+    state.audit = data.audit || [];
+  } catch(e) {
+    console.error('Init error', e);
+  }
+}
+
+const TITLES={dashboard:'Dashboard',instruments:'All instruments',consumables:'Consumables','log-use':'Log use / fault',faults:'Fault log',audit:'Audit trail'};
+let currentSection = 'dashboard';
+
+function nav(id, el) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+  if(el) el.classList.add('active');
+  document.getElementById('page-title').textContent = TITLES[id]||id;
+  currentSection = id;
+  if(id==='dashboard') renderDashboard();
+  if(id==='instruments') renderInstruments();
+  if(id==='consumables') renderConsumables();
+  if(id==='log-use') initLogForms();
+  if(id==='faults') renderFaults();
+  if(id==='audit') renderAudit();
+}
+
+function rerenderCurrentSection() {
+  if(currentSection==='dashboard') renderDashboard();
+  if(currentSection==='instruments') renderInstruments();
+  if(currentSection==='consumables') renderConsumables();
+  if(currentSection==='faults') renderFaults();
+  if(currentSection==='audit') renderAudit();
+}
+
+function bc(p){return p<=20?'#f05555':p<=40?'#f0a742':'#34c98a';}
+function sbadge(s){const m={Circulation:'green','SB Instrument':'blue','URO Set':'blue','Non-sterile':'gray',Complete:'gray'};return`<span class="badge ${m[s]||'gray'}">${s}</span>`;}
+function fbadge(k){const serious=['Wire broken','Intra-op failure','Wire frail'];return`<span class="badge ${serious.includes(k)?'red':'amber'}">${k}</span>`;}
+
+function renderDashboard() {
+  const inC=state.instruments.filter(i=>i.status==='Circulation').length;
+  const crit=state.instruments.filter(i=>i.usesLeft!==null&&i.usesLeft<=2&&i.status==='Circulation').length;
+  const wires=state.faults.filter(f=>(f.Kind||f.kind)==='Wire broken').length;
+  const consA=state.consumables.filter(c=>c.maxBalance===1&&c.balance===1).length;
+  document.getElementById('dash-cards').innerHTML=`
+    <div class="sc ok"><div class="sc-lbl">In circulation</div><div class="sc-num">${inC}</div></div>
+    <div class="sc ${crit>0?'danger':'ok'}"><div class="sc-lbl">Critical (≤2 uses left)</div><div class="sc-num">${crit}</div></div>
+    <div class="sc"><div class="sc-lbl">SB instruments</div><div class="sc-num">${state.instruments.filter(i=>i.status==='SB Instrument').length}</div></div>
+    <div class="sc warn"><div class="sc-lbl">Faults logged</div><div class="sc-num">${state.faults.length}</div></div>
+    <div class="sc danger"><div class="sc-lbl">Wire break events</div><div class="sc-num">${wires}</div></div>
+    <div class="sc info"><div class="sc-lbl">Consumables available</div><div class="sc-num">${consA}</div></div>`;
+  const cr=state.instruments.filter(i=>i.usesLeft!==null&&i.usesLeft<=2&&i.status!=='Complete');
+  document.getElementById('dash-critical').innerHTML=cr.length===0?'<div class="empty">No instruments critical right now</div>':
+    cr.map(i=>`<div class="crit-item"><div><div class="crit-sn">${i.sn}</div><div class="crit-type">${i.type}</div></div><span class="badge red">${i.usesLeft} use${i.usesLeft===1?'':'s'} left</span></div>`).join('');
+  const rf=[...state.faults].sort((a,b)=>(b.Date||b.date||'').localeCompare(a.Date||a.date||'')).slice(0,5);
+  document.getElementById('dash-faults').innerHTML=rf.length===0?'<div class="empty">No faults logged</div>':
+    rf.map(f=>`<div class="fi"><div class="fi-top"><span class="fi-sn">${f.SN||f.sn}</span>${fbadge(f.Kind||f.kind)}<span class="fi-date">${f.Date||f.date}</span></div><div class="fi-note">${f.Notes||f.notes||'—'}</div></div>`).join('');
+  const clips=state.consumables.filter(c=>c.type.toLowerCase().includes('clip'));
+  document.getElementById('dash-consumables').innerHTML=clips.length===0?'<div class="empty">No consumable data</div>':clips.map(c=>{const p=Math.round(c.balance/c.maxBalance*100);const col=bc(p);return`<div class="ci"><div class="ci-info"><div class="ci-sn">${c.sn}</div><div class="ci-sub">${c.type}</div></div><div class="ci-bar"><div class="ci-fill" style="width:${p}%;background:${col}"></div></div><div class="ci-pct" style="color:${col}">${c.balance}/${c.maxBalance}</div></div>`;}).join('');
+}
+
+function renderInstruments() {
+  const types=[...new Set(state.instruments.map(i=>i.type))].sort();
+  const td=document.getElementById('filt-type');const cur=td.value;
+  td.innerHTML='<option value="">All types</option>'+types.map(t=>`<option${t===cur?' selected':''}>${t}</option>`).join('');
+  const ft=td.value;const fs=document.getElementById('filt-status').value;
+  const list=state.instruments.filter(i=>(!ft||i.type===ft)&&(!fs||i.status===fs));
+  document.getElementById('instr-table').innerHTML=list.length===0?'<tr><td colspan="6" class="empty">No instruments found</td></tr>':
+    list.map(i=>{const p=i.maxLife!==null?Math.round(i.usesLeft/i.maxLife*100):null;
+      const bar=p!==null?`<div class="lw"><div class="lb"><div class="lf" style="width:${p}%;background:${bc(p)}"></div></div><span class="ll" style="color:${bc(p)}">${i.usesLeft}/${i.maxLife}</span></div>`:`<span style="color:#5a6282;font-size:12px">By session</span>`;
+      return`<tr><td class="mono">${i.sn}</td><td>${i.type}</td><td>${sbadge(i.status)}</td><td>${bar}</td><td style="color:#8b93ab;font-size:12px">${i.lastUsed||'—'}</td><td style="color:#8b93ab;font-size:12px;max-width:200px">${i.remarks||'—'}</td></tr>`;}).join('');
+}
+
+function renderConsumables() {
+  const groups={};state.consumables.forEach(c=>{if(!groups[c.type])groups[c.type]=[];groups[c.type].push(c);});
+  document.getElementById('cons-list').innerHTML=Object.keys(groups).length===0?'<div class="empty">No consumable data</div>':Object.entries(groups).map(([type,items])=>`
+    <div style="margin-bottom:20px"><div style="font-size:11px;font-weight:600;color:#5a6282;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">${type}</div>
+    ${items.map(c=>{const p=Math.round(c.balance/c.maxBalance*100);const col=bc(p);return`<div class="ci"><div class="ci-info"><div class="ci-sn">${c.sn}</div>${c.expiry?`<div class="ci-sub">Exp: ${c.expiry}</div>`:''}${c.lastUsed?`<div class="ci-sub">Last used: ${c.lastUsed}</div>`:''}</div><div class="ci-bar"><div class="ci-fill" style="width:${p}%;background:${col}"></div></div><div class="ci-pct" style="color:${col}">${c.balance}/${c.maxBalance}</div></div>`;}).join('')}</div>`).join('');
+}
+
+function initLogForms() {
+  const today=new Date().toISOString().slice(0,10);
+  document.getElementById('log-date').value=today;
+  document.getElementById('fault-date').value=today;
+  const types=[...new Set(state.instruments.map(i=>i.type))].sort();
+  const opts='<option value="">Select type...</option>'+types.map(t=>`<option>${t}</option>`).join('');
+  ['log-type','fault-type','undo-type'].forEach(id=>document.getElementById(id).innerHTML=opts);
+  ['log-sn','fault-sn','undo-sn'].forEach(id=>document.getElementById(id).innerHTML='<option value="">Select SN...</option>');
+}
+
+function populateSNDropdown() {
+  const t=document.getElementById('log-type').value;
+  const list=state.instruments.filter(i=>i.type===t&&i.status!=='Complete'&&i.usesLeft!==0);
+  document.getElementById('log-sn').innerHTML='<option value="">Select SN...</option>'+list.map(i=>`<option value="${i.sn}">${i.sn}${i.usesLeft!==null?' ('+i.usesLeft+' left)':''}</option>`).join('');
+}
+
+function populateFaultSN() {
+  const t=document.getElementById('fault-type').value;
+  const list=state.instruments.filter(i=>i.type===t);
+  document.getElementById('fault-sn').innerHTML='<option value="">Select SN...</option>'+list.map(i=>`<option value="${i.sn}">${i.sn}</option>`).join('');
+}
+
+function populateUndoSN() {
+  const t=document.getElementById('undo-type').value;
+  const list=state.instruments.filter(i=>i.type===t&&i.maxLife!==null&&i.usesLeft<i.maxLife);
+  document.getElementById('undo-sn').innerHTML='<option value="">Select SN...</option>'+list.map(i=>`<option value="${i.sn}">${i.sn} (${i.usesLeft}/${i.maxLife} left)</option>`).join('');
+}
+
+function showMsg(id,text,type){const el=document.getElementById(id);el.className='msg '+type;el.textContent=text;setTimeout(()=>{el.textContent='';el.className='';},6000);}
+
+function setBtn(id, loading) {
+  const b = document.getElementById(id);
+  b.disabled = loading;
+  if (loading) b.innerHTML = '<span class="spinner"></span>Saving...';
+  else b.textContent = b.id === 'btn-log-use' ? 'Record use' : b.id === 'btn-log-fault' ? 'Record fault' : '↩ Undo use & return instrument';
+}
+
+async function logUse() {
+  const type=document.getElementById('log-type').value,sn=document.getElementById('log-sn').value,date=document.getElementById('log-date').value,staff=document.getElementById('log-staff').value,cas=document.getElementById('log-case').value;
+  if(!type||!sn||!date){showMsg('log-msg','Please fill in type, SN and date.','err');return;}
+  const inst=state.instruments.find(i=>i.sn===sn);
+  if(!inst){showMsg('log-msg','Instrument not found.','err');return;}
+  if(inst.usesLeft!==null&&inst.usesLeft<=0){showMsg('log-msg','No uses remaining.','err');return;}
+  setBtn('btn-log-use',true);
+  try {
+    if(inst.usesLeft!==null) inst.usesLeft=Math.max(0,inst.usesLeft-1);
+    inst.lastUsed=date;
+    if(inst.usesLeft===0) inst.status='Complete';
+    await api({action:'saveInstrument',SN:inst.sn,Type:inst.type,Status:inst.status,UsesLeft:inst.usesLeft,MaxLife:inst.maxLife,LastUsed:inst.lastUsed,Remarks:inst.remarks});
+    const auditNote=`Case: ${cas||'—'} | Uses left: ${inst.usesLeft!==null?inst.usesLeft:'N/A'}`;
+    await api({action:'saveAudit',Timestamp:new Date().toISOString(),Event:'Use logged',Type:inst.type,SN:inst.sn,Staff:staff,Notes:auditNote});
+    setSyncStatus('ok','Saved · '+new Date().toLocaleTimeString('en-SG',{hour:'2-digit',minute:'2-digit'}));
+    if(inst.usesLeft!==null&&inst.usesLeft<=2){showMsg('log-msg',`Recorded. Warning: ${inst.usesLeft} use(s) remaining — consider replacement.`,'warn');}
+    else{showMsg('log-msg',`Use recorded for ${sn}.`,'ok');}
+    populateSNDropdown();
+    if(currentSection==='dashboard') renderDashboard();
+  } catch(e) {
+    setSyncStatus('err','Save failed');
+    showMsg('log-msg','Failed to save. Check your connection.','err');
+  }
+  setBtn('btn-log-use',false);
+}
+
+async function logFault() {
+  const type=document.getElementById('fault-type').value,sn=document.getElementById('fault-sn').value,kind=document.getElementById('fault-kind').value,date=document.getElementById('fault-date').value,notes=document.getElementById('fault-notes').value,staff=document.getElementById('fault-staff').value;
+  if(!type||!sn||!kind||!date){showMsg('fault-msg','Please fill in type, SN, fault type and date.','err');return;}
+  setBtn('btn-log-fault',true);
+  try {
+    const id='f'+Date.now();
+    await api({action:'saveFault',ID:id,Date:date,Type:type,SN:sn,Kind:kind,Notes:notes,Staff:staff});
+    await api({action:'saveAudit',Timestamp:new Date().toISOString(),Event:'Fault logged',Type:type,SN:sn,Staff:staff,Notes:`${kind}: ${notes}`});
+    state.faults.unshift({ID:id,Date:date,Type:type,SN:sn,Kind:kind,Notes:notes,Staff:staff});
+    setSyncStatus('ok','Saved · '+new Date().toLocaleTimeString('en-SG',{hour:'2-digit',minute:'2-digit'}));
+    showMsg('fault-msg','Fault recorded.','ok');
+    document.getElementById('fault-notes').value='';
+    document.getElementById('fault-staff').value='';
+    document.getElementById('nav-faults').innerHTML=`<span class="ni">!</span>Fault log<span class="nbadge">${state.faults.length}</span>`;
+  } catch(e) {
+    setSyncStatus('err','Save failed');
+    showMsg('fault-msg','Failed to save. Check your connection.','err');
+  }
+  setBtn('btn-log-fault',false);
+}
+
+async function undoUse() {
+  const type=document.getElementById('undo-type').value,sn=document.getElementById('undo-sn').value,reason=document.getElementById('undo-reason').value,staff=document.getElementById('undo-staff').value,notes=document.getElementById('undo-notes').value;
+  if(!type||!sn||!reason||!staff){showMsg('undo-msg','Please fill in type, SN, reason and authorising supervisor.','err');return;}
+  const inst=state.instruments.find(i=>i.sn===sn);
+  if(!inst){showMsg('undo-msg','Instrument not found.','err');return;}
+  if(inst.maxLife===null){showMsg('undo-msg','Undo not applicable to session-tracked instruments.','err');return;}
+  setBtn('btn-undo',true);
+  try {
+    inst.usesLeft=Math.min(inst.maxLife,inst.usesLeft+1);
+    if(inst.status==='Complete'&&inst.usesLeft>0) inst.status='Circulation';
+    await api({action:'saveInstrument',SN:inst.sn,Type:inst.type,Status:inst.status,UsesLeft:inst.usesLeft,MaxLife:inst.maxLife,LastUsed:inst.lastUsed,Remarks:inst.remarks});
+    const auditNote=`Reason: ${reason}${notes?' | '+notes:''} | Uses now: ${inst.usesLeft}/${inst.maxLife}`;
+    await api({action:'saveAudit',Timestamp:new Date().toISOString(),Event:'Use REVERSED',Type:inst.type,SN:inst.sn,Staff:staff,Notes:auditNote});
+    setSyncStatus('ok','Saved · '+new Date().toLocaleTimeString('en-SG',{hour:'2-digit',minute:'2-digit'}));
+    showMsg('undo-msg',`Done. ${sn} returned — now ${inst.usesLeft}/${inst.maxLife} uses remaining.`,'ok');
+    document.getElementById('undo-notes').value='';
+    document.getElementById('undo-staff').value='';
+    populateUndoSN();
+  } catch(e) {
+    setSyncStatus('err','Save failed');
+    showMsg('undo-msg','Failed to save. Check your connection.','err');
+  }
+  setBtn('btn-undo',false);
+}
+
+function renderFaults() {
+  const types=[...new Set(state.faults.map(f=>f.Type||f.type||''))].sort();
+  const fd=document.getElementById('ffilt-type');const cur=fd.value;
+  fd.innerHTML='<option value="">All types</option>'+types.map(t=>`<option${t===cur?' selected':''}>${t}</option>`).join('');
+  const ft=fd.value,fk=document.getElementById('ffilt-kind').value;
+  const list=[...state.faults].filter(f=>(!ft||(f.Type||f.type)===ft)&&(!fk||(f.Kind||f.kind)===fk)).sort((a,b)=>(b.Date||b.date||'').localeCompare(a.Date||a.date||''));
+  document.getElementById('fault-list').innerHTML=list.length===0?'<div class="empty">No faults logged</div>':
+    list.map(f=>`<div class="fi"><div class="fi-top"><span class="fi-sn">${f.SN||f.sn}</span><span style="font-size:11px;color:#5a6282">${f.Type||f.type}</span>${fbadge(f.Kind||f.kind)}<span class="fi-date">${f.Date||f.date}</span></div><div class="fi-note">${f.Notes||f.notes||'—'}${(f.Staff||f.staff)?' — '+(f.Staff||f.staff):''}</div></div>`).join('');
+}
+
+function renderAudit() {
+  const rows=state.audit;
+  document.getElementById('audit-table').innerHTML=rows.length===0?'<tr><td colspan="6" class="empty">No events recorded yet</td></tr>':
+    [...rows].reverse().map(r=>`<tr><td style="font-family:var(--mono);font-size:11px;color:#5a6282">${(r.Timestamp||r.timestamp||'').toString().slice(0,19).replace('T',' ')}</td><td><span class="badge ${(r.Event||r.event||'').includes('Fault')?'amber':(r.Event||r.event||'').includes('REVERSED')?'red':'blue'}">${r.Event||r.event}</span></td><td style="font-size:12px">${r.Type||r.type}</td><td class="mono">${r.SN||r.sn}</td><td style="font-size:12px">${r.Staff||r.staff||'—'}</td><td style="font-size:12px;color:#8b93ab">${r.Notes||r.notes||'—'}</td></tr>`).join('');
+}
+
+function dl(text,fn){const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(text);a.download=fn;a.click();}
+function exportAll(){dl(['SN,Type,Status,Uses Left,Max Life,Last Used,Remarks',...state.instruments.map(i=>[i.sn,i.type,i.status,i.usesLeft,i.maxLife,i.lastUsed,i.remarks].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`).join(','))].join('\n'),'instruments_'+new Date().toISOString().slice(0,10)+'.csv');}
+function exportAudit(){dl(['Timestamp,Event,Type,SN,Staff,Notes',...state.audit.map(r=>[(r.Timestamp||r.timestamp),(r.Event||r.event),(r.Type||r.type),(r.SN||r.sn),(r.Staff||r.staff),(r.Notes||r.notes)].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`).join(','))].join('\n'),'audit_'+new Date().toISOString().slice(0,10)+'.csv');}
+
+function updateClock(){const n=new Date();document.getElementById('clock').textContent=n.toLocaleDateString('en-SG',{weekday:'short',day:'numeric',month:'short'})+' · '+n.toLocaleTimeString('en-SG',{hour:'2-digit',minute:'2-digit'});}
+
+// Boot
+(async () => {
+  updateClock();
+  setInterval(updateClock, 30000);
+  setInterval(refreshData, 60000); // auto-refresh every 60s
+  await initSheetData();
+  document.getElementById('loading-overlay').style.display = 'none';
+  setSyncStatus('ok', 'Connected');
+  document.getElementById('nav-faults').innerHTML=`<span class="ni">!</span>Fault log<span class="nbadge">${state.faults.length}</span>`;
+  renderDashboard();
+  const initT=[...new Set(state.instruments.map(i=>i.type))].sort();
+  document.getElementById('filt-type').innerHTML='<option value="">All types</option>'+initT.map(t=>`<option>${t}</option>`).join('');
+  document.getElementById('ffilt-type').innerHTML='<option value="">All types</option>'+initT.map(t=>`<option>${t}</option>`).join('');
+})();
+</script>
+</body>
+</html>
