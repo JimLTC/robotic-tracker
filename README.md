@@ -68,13 +68,6 @@ No build tools, no npm, no dependencies. Works by opening `index.html` in any br
 | Download a CSV of all instruments or events | All instruments → Export / Audit trail → Export CSV |
 
 ---
-
-## Author
-
-**Jim Lam**  
-Nursing Informatics Champion, CGH Orthopaedic OT  
-Changi General Hospital, Singapore
-
 ---
 
 *This is a portfolio project demonstrating how clinical informatics principles can be applied to real operating theatre workflows — replacing manual tracking with a live, auditable, mobile-friendly web application backed by Google Sheets.*
