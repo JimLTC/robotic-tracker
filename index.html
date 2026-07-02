@@ -123,6 +123,9 @@
       <!-- Consumables -->
       <div id="sec-consumables" class="section">
         <div class="sh"><h1>Consumables</h1></div>
+        <div class="filter-row">
+          <select id="cfilt-type" onchange="renderConsumables()"><option value="">All types</option></select>
+        </div>
         <div class="panel">
           <div class="ph"><h2>Clip applicators &amp; single-use stock</h2></div>
           <div class="pb" id="cons-list"></div>
@@ -145,11 +148,11 @@
                 </div>
                 <div class="fg">
                   <label>Serial number</label>
-                  <select id="log-sn"><option value="">Select SN...</option></select>
+                  <select id="log-sn" onchange="checkLogUseSameDay()"><option value="">Select SN...</option></select>
                 </div>
               </div>
               <div class="form-grid">
-                <div class="fg"><label>Date used</label><input type="date" id="log-date"></div>
+                <div class="fg"><label>Date used</label><input type="date" id="log-date" onchange="checkLogUseSameDay()"></div>
                 <div class="fg"><label>Staff name / ID</label><input type="text" id="log-staff" placeholder="e.g. Jim / S1234"></div>
               </div>
               <div class="fg" style="margin-bottom:14px">
@@ -450,6 +453,9 @@
   </button>
   <button class="bn-item" data-sec="instruments" onclick="nav('instruments')">
     <span class="bn-icon">◈</span><span>Instruments</span>
+  </button>
+  <button class="bn-item" data-sec="consumables" onclick="nav('consumables')">
+    <span class="bn-icon">◻</span><span>Consumables</span>
   </button>
   <button class="bn-item" data-sec="log-use" onclick="nav('log-use')">
     <span class="bn-icon">+</span><span>Log use</span>

@@ -338,8 +338,14 @@ function renderInstruments() {
 // ── Consumables ───────────────────────────────────────────────────────────────
 
 function renderConsumables() {
+  const types = [...new Set(state.consumables.map(c => c.type))].sort();
+  const td = document.getElementById('cfilt-type');
+  const cur = td.value;
+  td.innerHTML = '<option value="">All types</option>' + types.map(t => `<option${t === cur ? ' selected' : ''}>${t}</option>`).join('');
+
+  const ft = td.value;
   const groups = {};
-  state.consumables.forEach(c => { if (!groups[c.type]) groups[c.type] = []; groups[c.type].push(c); });
+  state.consumables.filter(c => !ft || c.type === ft).forEach(c => { if (!groups[c.type]) groups[c.type] = []; groups[c.type].push(c); });
 
   document.getElementById('cons-list').innerHTML = Object.keys(groups).length === 0
     ? '<div class="empty">No consumable data</div>'
@@ -375,13 +381,32 @@ function initLogForms() {
   ['log-sn', 'fault-sn', 'undo-sn'].forEach(id => document.getElementById(id).innerHTML = '<option value="">Select SN...</option>');
 }
 
+function isSameDay(d1, d2) {
+  return !!d1 && !!d2 && d1.slice(0, 10) === d2.slice(0, 10);
+}
+
 function populateSNDropdown() {
-  const t = document.getElementById('log-type').value;
+  const t    = document.getElementById('log-type').value;
+  const date = document.getElementById('log-date').value;
   const list = state.instruments.filter(i =>
     i.type === t && i.status !== 'Complete' && i.status !== 'Condemned' && i.usesLeft !== 0
   );
   document.getElementById('log-sn').innerHTML = '<option value="">Select SN...</option>' +
-    list.map(i => `<option value="${i.sn}">${i.sn}${i.usesLeft !== null ? ' (' + i.usesLeft + ' left)' : ''}</option>`).join('');
+    list.map(i => {
+      const usedSameDay = isSameDay(i.lastUsed, date);
+      return `<option value="${i.sn}">${i.sn}${i.usesLeft !== null ? ' (' + i.usesLeft + ' left)' : ''}${usedSameDay ? ' — already used ' + date : ''}</option>`;
+    }).join('');
+  checkLogUseSameDay();
+}
+
+function checkLogUseSameDay() {
+  const sn   = document.getElementById('log-sn').value;
+  const date = document.getElementById('log-date').value;
+  if (!sn || !date) return;
+  const inst = state.instruments.find(i => i.sn === sn);
+  if (inst && isSameDay(inst.lastUsed, date)) {
+    showMsg('log-msg', `⚠ ${sn} has already been logged for use on ${date} and has not been Undo'd. Use "Undo a logged use" below if this was logged in error.`, 'warn');
+  }
 }
 
 function populateFaultSN() {
@@ -412,6 +437,10 @@ async function logUse() {
   const inst = state.instruments.find(i => i.sn === sn);
   if (!inst) { showMsg('log-msg', 'Instrument not found.', 'err'); return; }
   if (inst.usesLeft !== null && inst.usesLeft <= 0) { showMsg('log-msg', 'No uses remaining.', 'err'); return; }
+  if (isSameDay(inst.lastUsed, date)) {
+    showMsg('log-msg', `${sn} has already been logged for use on ${date} and has not been Undo'd. Use "Undo a logged use" below if this was logged in error.`, 'err');
+    return;
+  }
 
   const newUsesLeft = inst.usesLeft !== null ? Math.max(0, inst.usesLeft - 1) : null;
   const newStatus   = newUsesLeft === 0 ? 'Complete' : inst.status;
@@ -491,12 +520,13 @@ async function undoUse() {
 
   setBtn('btn-undo', true);
   try {
-    await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: newStatus, UsesLeft: newUsesLeft, MaxLife: inst.maxLife, LastUsed: inst.lastUsed, Remarks: inst.remarks });
+    await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: newStatus, UsesLeft: newUsesLeft, MaxLife: inst.maxLife, LastUsed: '', Remarks: inst.remarks });
     const auditNote = `Reason: ${reason}${notes ? ' | ' + notes : ''} | Uses now: ${newUsesLeft}/${inst.maxLife}`;
     await api({ action: 'saveAudit', Timestamp: new Date().toISOString(), Event: 'Use REVERSED', Type: inst.type, SN: inst.sn, Staff: staff, Notes: auditNote });
 
     inst.usesLeft = newUsesLeft;
     inst.status   = newStatus;
+    inst.lastUsed = '';
 
     setSyncStatus('ok', 'Saved · ' + fmtTime());
     showMsg('undo-msg', `Done. ${sn} returned — now ${inst.usesLeft}/${inst.maxLife} uses remaining.`, 'ok');
