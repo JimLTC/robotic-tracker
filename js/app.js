@@ -164,14 +164,19 @@ const TITLES = {
 
 let currentSection = 'dashboard';
 
+const MORE_SECTIONS = ['manage', 'faults', 'audit'];
+
 function nav(id) {
+  closeMoreMenu();
+
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.getElementById('sec-' + id).classList.add('active');
 
-  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.bn-item').forEach(b => b.classList.remove('active'));
-
+  document.querySelectorAll('.nav-item, .bn-item, .more-item').forEach(b => b.classList.remove('active'));
   document.querySelectorAll(`[data-sec="${id}"]`).forEach(b => b.classList.add('active'));
+
+  const moreBtn = document.getElementById('bn-more');
+  if (moreBtn) moreBtn.classList.toggle('active', MORE_SECTIONS.includes(id));
 
   document.getElementById('page-title').textContent = TITLES[id] || id;
   currentSection = id;
@@ -183,6 +188,14 @@ function nav(id) {
   if (id === 'manage')      initManageForms();
   if (id === 'faults')      renderFaults();
   if (id === 'audit')       renderAudit();
+}
+
+function toggleMoreMenu() {
+  document.getElementById('more-overlay').classList.add('open');
+}
+
+function closeMoreMenu() {
+  document.getElementById('more-overlay').classList.remove('open');
 }
 
 function rerenderCurrentSection() {
@@ -247,8 +260,21 @@ function setBtn(id, loading) {
 
 function updateFaultsBadge() {
   const el = document.getElementById('nav-faults');
-  if (!el) return;
-  el.innerHTML = `<span class="ni">⚑</span><span class="nl">Fault log</span>${state.faults.length ? `<span class="nbadge">${state.faults.length}</span>` : ''}`;
+  if (el) el.innerHTML = `<span class="ni">⚑</span><span class="nl">Fault log</span>${state.faults.length ? `<span class="nbadge">${state.faults.length}</span>` : ''}`;
+
+  const count = state.faults.length;
+
+  const moreFaultsBadge = document.getElementById('more-faults-badge');
+  if (moreFaultsBadge) {
+    moreFaultsBadge.textContent = count;
+    moreFaultsBadge.style.display = count ? '' : 'none';
+  }
+
+  const bnMoreBadge = document.getElementById('bn-more-badge');
+  if (bnMoreBadge) {
+    bnMoreBadge.textContent = count;
+    bnMoreBadge.style.display = count ? '' : 'none';
+  }
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
@@ -302,6 +328,36 @@ function renderDashboard() {
           <div class="ci-pct" style="color:${bc(p)}">${c.balance}/${c.maxBalance}</div>
         </div>`;
       }).join('');
+
+  document.getElementById('dash-count-critical').textContent    = cr.length;
+  document.getElementById('dash-count-faults').textContent      = state.faults.length;
+  document.getElementById('dash-count-consumables').textContent = clips.length;
+  applyDashPanelState();
+}
+
+// ── Dashboard panel collapse/expand (persisted) ──────────────────────────────
+
+const DASH_PANELS = ['critical', 'faults', 'consumables'];
+
+function getCollapsedDashPanels() {
+  try { return JSON.parse(localStorage.getItem('dashCollapsedPanels') || '[]'); }
+  catch (e) { return []; }
+}
+
+function toggleDashPanel(id) {
+  const collapsed = getCollapsedDashPanels();
+  const idx = collapsed.indexOf(id);
+  if (idx === -1) collapsed.push(id); else collapsed.splice(idx, 1);
+  localStorage.setItem('dashCollapsedPanels', JSON.stringify(collapsed));
+  applyDashPanelState();
+}
+
+function applyDashPanelState() {
+  const collapsed = getCollapsedDashPanels();
+  DASH_PANELS.forEach(id => {
+    const panel = document.getElementById('dash-panel-' + id);
+    if (panel) panel.classList.toggle('collapsed', collapsed.includes(id));
+  });
 }
 
 // ── All Instruments ───────────────────────────────────────────────────────────
@@ -314,7 +370,10 @@ function renderInstruments() {
 
   const ft = td.value;
   const fs = document.getElementById('filt-status').value;
-  const list = state.instruments.filter(i => (!ft || i.type === ft) && (!fs || i.status === fs));
+  const showComplete = document.getElementById('filt-show-complete').checked;
+  const list = state.instruments.filter(i =>
+    (!ft || i.type === ft) && (!fs || i.status === fs) && (showComplete || fs === 'Complete' || i.status !== 'Complete')
+  );
 
   document.getElementById('instr-table').innerHTML = list.length === 0
     ? '<tr><td colspan="6" class="empty">No instruments found</td></tr>'
@@ -344,8 +403,11 @@ function renderConsumables() {
   td.innerHTML = '<option value="">All types</option>' + types.map(t => `<option${t === cur ? ' selected' : ''}>${t}</option>`).join('');
 
   const ft = td.value;
+  const showDepleted = document.getElementById('cfilt-show-depleted').checked;
   const groups = {};
-  state.consumables.filter(c => !ft || c.type === ft).forEach(c => { if (!groups[c.type]) groups[c.type] = []; groups[c.type].push(c); });
+  state.consumables
+    .filter(c => (!ft || c.type === ft) && (showDepleted || c.balance > 0))
+    .forEach(c => { if (!groups[c.type]) groups[c.type] = []; groups[c.type].push(c); });
 
   document.getElementById('cons-list').innerHTML = Object.keys(groups).length === 0
     ? '<div class="empty">No consumable data</div>'
@@ -713,10 +775,43 @@ function renderFaults() {
 
 // ── Audit trail ───────────────────────────────────────────────────────────────
 
+function filteredAuditRows() {
+  const fe   = document.getElementById('afilt-event').value;
+  const ft   = document.getElementById('afilt-type').value;
+  const from = document.getElementById('afilt-from').value;
+  const to   = document.getElementById('afilt-to').value;
+
+  return [...state.audit].reverse().filter(r => {
+    const event = r.Event || r.event || '';
+    const type  = r.Type  || r.type  || '';
+    const day   = (r.Timestamp || r.timestamp || '').toString().slice(0, 10);
+    return (!fe || event === fe) && (!ft || type === ft) && (!from || day >= from) && (!to || day <= to);
+  });
+}
+
+function clearAuditFilters() {
+  document.getElementById('afilt-event').value = '';
+  document.getElementById('afilt-type').value  = '';
+  document.getElementById('afilt-from').value  = '';
+  document.getElementById('afilt-to').value    = '';
+  renderAudit();
+}
+
 function renderAudit() {
-  const rows = [...state.audit].reverse();
+  const events = [...new Set(state.audit.map(r => r.Event || r.event || ''))].filter(Boolean).sort();
+  const ed  = document.getElementById('afilt-event');
+  const curE = ed.value;
+  ed.innerHTML = '<option value="">All events</option>' + events.map(e => `<option${e === curE ? ' selected' : ''}>${e}</option>`).join('');
+
+  const types = [...new Set(state.audit.map(r => r.Type || r.type || ''))].filter(Boolean).sort();
+  const td  = document.getElementById('afilt-type');
+  const curT = td.value;
+  td.innerHTML = '<option value="">All types</option>' + types.map(t => `<option${t === curT ? ' selected' : ''}>${t}</option>`).join('');
+
+  const rows = filteredAuditRows();
+
   document.getElementById('audit-table').innerHTML = rows.length === 0
-    ? '<tr><td colspan="6" class="empty">No events recorded yet</td></tr>'
+    ? '<tr><td colspan="6" class="empty">No events found</td></tr>'
     : rows.map(r => {
         const event = r.Event || r.event || '';
         return `
@@ -752,7 +847,7 @@ function exportAll() {
 
 function exportAudit() {
   const rows = ['Timestamp,Event,Type,SN,Staff,Notes',
-    ...state.audit.map(r => [r.Timestamp || r.timestamp, r.Event || r.event, r.Type || r.type, r.SN || r.sn, r.Staff || r.staff, r.Notes || r.notes].map(csv).join(','))];
+    ...filteredAuditRows().map(r => [r.Timestamp || r.timestamp, r.Event || r.event, r.Type || r.type, r.SN || r.sn, r.Staff || r.staff, r.Notes || r.notes].map(csv).join(','))];
   dl(rows.join('\n'), 'audit_' + new Date().toISOString().slice(0, 10) + '.csv');
 }
 

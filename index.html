@@ -73,17 +73,26 @@
       <div id="sec-dashboard" class="section active">
         <div class="stat-grid" id="dash-cards"></div>
         <div class="dash-grid">
-          <div class="panel">
-            <div class="ph"><h2>⚠ Critical — ≤2 uses left</h2></div>
+          <div class="panel" id="dash-panel-critical">
+            <div class="ph collapsible" onclick="toggleDashPanel('critical')">
+              <h2>⚠ Critical — ≤2 uses left</h2>
+              <div class="ph-right"><span class="ph-count" id="dash-count-critical"></span><span class="chev" id="chev-critical">▾</span></div>
+            </div>
             <div class="pb" id="dash-critical"></div>
           </div>
-          <div class="panel">
-            <div class="ph"><h2>Recent faults</h2></div>
+          <div class="panel" id="dash-panel-faults">
+            <div class="ph collapsible" onclick="toggleDashPanel('faults')">
+              <h2>Recent faults</h2>
+              <div class="ph-right"><span class="ph-count" id="dash-count-faults"></span><span class="chev" id="chev-faults">▾</span></div>
+            </div>
             <div class="pb" id="dash-faults"></div>
           </div>
         </div>
-        <div class="panel">
-          <div class="ph"><h2>Consumable stock levels</h2></div>
+        <div class="panel" id="dash-panel-consumables">
+          <div class="ph collapsible" onclick="toggleDashPanel('consumables')">
+            <h2>Consumable stock levels</h2>
+            <div class="ph-right"><span class="ph-count" id="dash-count-consumables"></span><span class="chev" id="chev-consumables">▾</span></div>
+          </div>
           <div class="pb" id="dash-consumables"></div>
         </div>
       </div>
@@ -102,6 +111,7 @@
             <option>Complete</option>
             <option>Condemned</option>
           </select>
+          <label class="chk"><input type="checkbox" id="filt-show-complete" onchange="renderInstruments()"> Show completed</label>
         </div>
         <div class="panel table-wrap">
           <table>
@@ -125,6 +135,7 @@
         <div class="sh"><h1>Consumables</h1></div>
         <div class="filter-row">
           <select id="cfilt-type" onchange="renderConsumables()"><option value="">All types</option></select>
+          <label class="chk"><input type="checkbox" id="cfilt-show-depleted" onchange="renderConsumables()"> Show depleted</label>
         </div>
         <div class="panel">
           <div class="ph"><h2>Clip applicators &amp; single-use stock</h2></div>
@@ -425,6 +436,13 @@
           <h1>Audit trail</h1>
           <button class="btn sm" onclick="exportAudit()">↓ Export CSV</button>
         </div>
+        <div class="filter-row">
+          <select id="afilt-event" onchange="renderAudit()"><option value="">All events</option></select>
+          <select id="afilt-type" onchange="renderAudit()"><option value="">All types</option></select>
+          <input type="date" id="afilt-from" onchange="renderAudit()" title="From date">
+          <input type="date" id="afilt-to" onchange="renderAudit()" title="To date">
+          <button class="btn sm" onclick="clearAuditFilters()">Clear filters</button>
+        </div>
         <div class="panel table-wrap">
           <table>
             <thead>
@@ -460,16 +478,27 @@
   <button class="bn-item" data-sec="log-use" onclick="nav('log-use')">
     <span class="bn-icon">+</span><span>Log use</span>
   </button>
-  <button class="bn-item" data-sec="manage" onclick="nav('manage')">
-    <span class="bn-icon">⊕</span><span>Manage</span>
-  </button>
-  <button class="bn-item" data-sec="faults" onclick="nav('faults')">
-    <span class="bn-icon">⚑</span><span>Faults</span>
-  </button>
-  <button class="bn-item" data-sec="audit" onclick="nav('audit')">
-    <span class="bn-icon">≡</span><span>Audit</span>
+  <button class="bn-item" id="bn-more" onclick="toggleMoreMenu()">
+    <span class="bn-icon-wrap"><span class="bn-icon">⋯</span><span class="bn-badge" id="bn-more-badge" style="display:none"></span></span>
+    <span>More</span>
   </button>
 </nav>
+
+<!-- "More" sheet (mobile only) -->
+<div class="more-overlay" id="more-overlay" onclick="closeMoreMenu()">
+  <div class="more-sheet" onclick="event.stopPropagation()">
+    <div class="more-handle"></div>
+    <button class="more-item" data-sec="manage" onclick="nav('manage')">
+      <span class="ni">⊕</span><span class="nl">Instrument management</span>
+    </button>
+    <button class="more-item" data-sec="faults" onclick="nav('faults')">
+      <span class="ni">⚑</span><span class="nl">Fault log</span><span class="nbadge" id="more-faults-badge" style="display:none"></span>
+    </button>
+    <button class="more-item" data-sec="audit" onclick="nav('audit')">
+      <span class="ni">≡</span><span class="nl">Audit trail</span>
+    </button>
+  </div>
+</div>
 
 <script src="js/app.js"></script>
 </body>
