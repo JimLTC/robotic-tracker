@@ -159,16 +159,16 @@
                 </div>
                 <div class="fg">
                   <label>Serial number</label>
-                  <select id="log-sn" onchange="checkLogUseSameDay()"><option value="">Select SN...</option></select>
+                  <select id="log-sn" onchange="checkLogUseSameCase()"><option value="">Select SN...</option></select>
                 </div>
               </div>
               <div class="form-grid">
-                <div class="fg"><label>Date used</label><input type="date" id="log-date" onchange="checkLogUseSameDay()"></div>
+                <div class="fg"><label>Date used</label><input type="date" id="log-date"></div>
                 <div class="fg"><label>Staff name / ID</label><input type="text" id="log-staff" placeholder="e.g. Jim / S1234"></div>
               </div>
               <div class="fg" style="margin-bottom:14px">
-                <label>Case / procedure (optional)</label>
-                <input type="text" id="log-case" placeholder="e.g. Robotic prostatectomy, OT3">
+                <label>Case / procedure</label>
+                <input type="text" id="log-case" placeholder="e.g. Robotic prostatectomy, OT3" oninput="checkLogUseSameCase()">
               </div>
               <button class="btn primary" id="btn-log-use" onclick="logUse()">Record use</button>
               <div id="log-msg"></div>

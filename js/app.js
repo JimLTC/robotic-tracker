@@ -66,8 +66,9 @@ function normaliseInstrument(r) {
     status:   r.Status   || r.status   || '',
     usesLeft: (r.UsesLeft === null || r.UsesLeft === '' || r.UsesLeft === undefined) ? null : Number(r.UsesLeft),
     maxLife:  (r.MaxLife  === null || r.MaxLife  === '' || r.MaxLife  === undefined) ? null : Number(r.MaxLife),
-    lastUsed: r.LastUsed || r.lastUsed || '',
-    remarks:  r.Remarks  || r.remarks  || '',
+    lastUsed: r.LastUsed  || r.lastUsed  || '',
+    lastCase: r.LastCase  || r.lastCase  || '',
+    remarks:  r.Remarks   || r.remarks   || '',
   };
 }
 
@@ -443,31 +444,27 @@ function initLogForms() {
   ['log-sn', 'fault-sn', 'undo-sn'].forEach(id => document.getElementById(id).innerHTML = '<option value="">Select SN...</option>');
 }
 
-function isSameDay(d1, d2) {
-  return !!d1 && !!d2 && d1.slice(0, 10) === d2.slice(0, 10);
-}
-
 function populateSNDropdown() {
-  const t    = document.getElementById('log-type').value;
-  const date = document.getElementById('log-date').value;
+  const t   = document.getElementById('log-type').value;
+  const cas = document.getElementById('log-case').value.trim();
   const list = state.instruments.filter(i =>
     i.type === t && i.status !== 'Complete' && i.status !== 'Condemned' && i.usesLeft !== 0
   );
   document.getElementById('log-sn').innerHTML = '<option value="">Select SN...</option>' +
     list.map(i => {
-      const usedSameDay = isSameDay(i.lastUsed, date);
-      return `<option value="${i.sn}">${i.sn}${i.usesLeft !== null ? ' (' + i.usesLeft + ' left)' : ''}${usedSameDay ? ' — already used ' + date : ''}</option>`;
+      const usedSameCase = i.lastCase && cas && i.lastCase === cas;
+      return `<option value="${i.sn}">${i.sn}${i.usesLeft !== null ? ' (' + i.usesLeft + ' left)' : ''}${usedSameCase ? ' — already used in case ' + i.lastCase : ''}</option>`;
     }).join('');
-  checkLogUseSameDay();
+  checkLogUseSameCase();
 }
 
-function checkLogUseSameDay() {
-  const sn   = document.getElementById('log-sn').value;
-  const date = document.getElementById('log-date').value;
-  if (!sn || !date) return;
+function checkLogUseSameCase() {
+  const sn  = document.getElementById('log-sn').value;
+  const cas = document.getElementById('log-case').value.trim();
+  if (!sn || !cas) return;
   const inst = state.instruments.find(i => i.sn === sn);
-  if (inst && isSameDay(inst.lastUsed, date)) {
-    showMsg('log-msg', `⚠ ${sn} has already been logged for use on ${date} and has not been Undo'd. Use "Undo a logged use" below if this was logged in error.`, 'warn');
+  if (inst && inst.lastCase && inst.lastCase === cas) {
+    showMsg('log-msg', `⚠ ${sn} has already been logged for case "${cas}" and has not been Undo'd. Use "Undo a logged use" below if this was logged in error.`, 'warn');
   }
 }
 
@@ -494,13 +491,13 @@ async function logUse() {
   const staff = document.getElementById('log-staff').value;
   const cas   = document.getElementById('log-case').value;
 
-  if (!type || !sn || !date) { showMsg('log-msg', 'Please fill in type, SN and date.', 'err'); return; }
+  if (!type || !sn || !date || !cas) { showMsg('log-msg', 'Please fill in type, SN, date and case.', 'err'); return; }
 
   const inst = state.instruments.find(i => i.sn === sn);
   if (!inst) { showMsg('log-msg', 'Instrument not found.', 'err'); return; }
   if (inst.usesLeft !== null && inst.usesLeft <= 0) { showMsg('log-msg', 'No uses remaining.', 'err'); return; }
-  if (isSameDay(inst.lastUsed, date)) {
-    showMsg('log-msg', `${sn} has already been logged for use on ${date} and has not been Undo'd. Use "Undo a logged use" below if this was logged in error.`, 'err');
+  if (inst.lastCase && inst.lastCase === cas) {
+    showMsg('log-msg', `${sn} has already been logged for case "${cas}" and has not been Undo'd. Use "Undo a logged use" below if this was logged in error.`, 'err');
     return;
   }
 
@@ -509,13 +506,14 @@ async function logUse() {
 
   setBtn('btn-log-use', true);
   try {
-    await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: newStatus, UsesLeft: newUsesLeft, MaxLife: inst.maxLife, LastUsed: date, Remarks: inst.remarks });
-    const auditNote = `Case: ${cas || '—'} | Uses left: ${newUsesLeft !== null ? newUsesLeft : 'N/A'}`;
+    await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: newStatus, UsesLeft: newUsesLeft, MaxLife: inst.maxLife, LastUsed: date, LastCase: cas, Remarks: inst.remarks });
+    const auditNote = `Case: ${cas} | Uses left: ${newUsesLeft !== null ? newUsesLeft : 'N/A'}`;
     await api({ action: 'saveAudit', Timestamp: new Date().toISOString(), Event: 'Use logged', Type: inst.type, SN: inst.sn, Staff: staff, Notes: auditNote });
 
     // Update local state only after successful write
     inst.usesLeft = newUsesLeft;
     inst.lastUsed = date;
+    inst.lastCase = cas;
     inst.status   = newStatus;
 
     setSyncStatus('ok', 'Saved · ' + fmtTime());
@@ -582,13 +580,14 @@ async function undoUse() {
 
   setBtn('btn-undo', true);
   try {
-    await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: newStatus, UsesLeft: newUsesLeft, MaxLife: inst.maxLife, LastUsed: '', Remarks: inst.remarks });
+    await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: newStatus, UsesLeft: newUsesLeft, MaxLife: inst.maxLife, LastUsed: '', LastCase: '', Remarks: inst.remarks });
     const auditNote = `Reason: ${reason}${notes ? ' | ' + notes : ''} | Uses now: ${newUsesLeft}/${inst.maxLife}`;
     await api({ action: 'saveAudit', Timestamp: new Date().toISOString(), Event: 'Use REVERSED', Type: inst.type, SN: inst.sn, Staff: staff, Notes: auditNote });
 
     inst.usesLeft = newUsesLeft;
     inst.status   = newStatus;
     inst.lastUsed = '';
+    inst.lastCase = '';
 
     setSyncStatus('ok', 'Saved · ' + fmtTime());
     showMsg('undo-msg', `Done. ${sn} returned — now ${inst.usesLeft}/${inst.maxLife} uses remaining.`, 'ok');
@@ -726,7 +725,7 @@ async function condemnInstrument() {
 
   setBtn('btn-condemn', true);
   try {
-    await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: 'Condemned', UsesLeft: inst.usesLeft, MaxLife: inst.maxLife, LastUsed: inst.lastUsed, Remarks: inst.remarks });
+    await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: 'Condemned', UsesLeft: inst.usesLeft, MaxLife: inst.maxLife, LastUsed: inst.lastUsed, LastCase: inst.lastCase, Remarks: inst.remarks });
     await api({ action: 'saveAudit', Timestamp: new Date().toISOString(), Event: 'Instrument condemned', Type: inst.type, SN: inst.sn, Staff: staff, Notes: `Reason: ${reason}${notes ? ' | ' + notes : ''}` });
 
     inst.status = 'Condemned';
