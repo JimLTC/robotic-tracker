@@ -543,24 +543,26 @@ async function logUse() {
   const date  = document.getElementById('log-date').value;
   const staff = document.getElementById('log-staff').value;
   const cas   = document.getElementById('log-case').value;
+  const qty   = Math.max(1, parseInt(document.getElementById('log-qty').value) || 1);
 
   if (!type || !sn || !date || !cas) { showMsg('log-msg', 'Please fill in type, SN, date and case.', 'err'); return; }
 
   const inst = state.instruments.find(i => i.sn === sn);
   if (!inst) { showMsg('log-msg', 'Instrument not found.', 'err'); return; }
   if (inst.usesLeft !== null && inst.usesLeft <= 0) { showMsg('log-msg', 'No uses remaining.', 'err'); return; }
+  if (inst.usesLeft !== null && qty > inst.usesLeft) { showMsg('log-msg', `Only ${inst.usesLeft} use(s) remaining — cannot log ${qty}.`, 'err'); return; }
   if (inst.lastCase && inst.lastCase === cas) {
     showMsg('log-msg', `${sn} has already been logged for case "${cas}" and has not been Undo'd. Use "Undo a logged use" below if this was logged in error.`, 'err');
     return;
   }
 
-  const newUsesLeft = inst.usesLeft !== null ? Math.max(0, inst.usesLeft - 1) : null;
+  const newUsesLeft = inst.usesLeft !== null ? Math.max(0, inst.usesLeft - qty) : null;
   const newStatus   = newUsesLeft === 0 ? 'Complete' : inst.status;
 
   setBtn('btn-log-use', true);
   try {
     await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: newStatus, UsesLeft: newUsesLeft, MaxLife: inst.maxLife, LastUsed: date, LastCase: cas, Remarks: inst.remarks });
-    const auditNote = `Case: ${cas} | Uses left: ${newUsesLeft !== null ? newUsesLeft : 'N/A'}`;
+    const auditNote = `Case: ${cas}${qty > 1 ? ` | Qty: ${qty}` : ''} | Uses left: ${newUsesLeft !== null ? newUsesLeft : 'N/A'}`;
     await api({ action: 'saveAudit', Timestamp: new Date().toISOString(), Event: 'Use logged', Type: inst.type, SN: inst.sn, Staff: staff, Notes: auditNote });
 
     // Update local state only after successful write

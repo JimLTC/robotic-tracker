@@ -170,6 +170,10 @@
                 <label>Case / procedure</label>
                 <input type="text" id="log-case" placeholder="e.g. 12345" oninput="checkLogUseSameCase()">
               </div>
+              <div class="fg" style="margin-bottom:14px">
+                <label>Quantity used</label>
+                <input type="number" id="log-qty" min="1" value="1" style="width:80px">
+              </div>
               <button class="btn primary" id="btn-log-use" onclick="logUse()">Record use</button>
               <div id="log-msg"></div>
             </div>
