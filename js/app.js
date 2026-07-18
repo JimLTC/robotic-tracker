@@ -421,7 +421,7 @@ function renderConsumables() {
           <div class="ci">
             <div class="ci-info">
               <div class="ci-sn">${c.sn}</div>
-              ${c.expiry   ? `<div class="ci-sub">Exp: ${c.expiry}</div>` : ''}
+              ${c.expiry   ? `<div class="ci-sub">Exp: ${c.expiry.slice(0, 10)}</div>` : ''}
               ${c.lastUsed ? `<div class="ci-sub">Last used: ${c.lastUsed}</div>` : ''}
             </div>
             <div class="ci-bar"><div class="ci-fill" style="width:${p}%;background:${bc(p)}"></div></div>
