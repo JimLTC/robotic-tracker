@@ -221,8 +221,8 @@ function sbadge(s) {
   const m = {
     'Circulation':   'green',
     'SB Instrument': 'blue',
-    'URO Set':       'blue',
-    'Non-sterile':   'gray',
+    'URO Set':       'purple',
+    'Non-sterile':   'amber',
     'Complete':      'gray',
     'Condemned':     'red',
   };
