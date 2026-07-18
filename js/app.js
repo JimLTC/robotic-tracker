@@ -437,11 +437,16 @@ function initLogForms() {
   const today = new Date().toISOString().slice(0, 10);
   document.getElementById('log-date').value   = today;
   document.getElementById('fault-date').value = today;
+  document.getElementById('clog-date').value  = today;
 
   const types = [...new Set(state.instruments.filter(i => i.status !== 'Condemned').map(i => i.type))].sort();
   const opts = '<option value="">Select type...</option>' + types.map(t => `<option>${t}</option>`).join('');
   ['log-type', 'fault-type', 'undo-type'].forEach(id => document.getElementById(id).innerHTML = opts);
   ['log-sn', 'fault-sn', 'undo-sn'].forEach(id => document.getElementById(id).innerHTML = '<option value="">Select SN...</option>');
+
+  const consTypes = [...new Set(state.consumables.map(c => c.type))].sort();
+  document.getElementById('clog-type').innerHTML = '<option value="">Select type...</option>' +
+    consTypes.map(t => `<option>${t}</option>`).join('');
 }
 
 function populateSNDropdown() {
@@ -482,6 +487,54 @@ function populateUndoSN() {
   );
   document.getElementById('undo-sn').innerHTML = '<option value="">Select SN...</option>' +
     list.map(i => `<option value="${i.sn}">${i.sn} (${i.usesLeft}/${i.maxLife} left)</option>`).join('');
+}
+
+function populateConsumableSNDropdown() {
+  const type = document.getElementById('clog-type').value;
+  const list = state.consumables.filter(c => c.type === type && c.balance > 0);
+  document.getElementById('clog-sn').innerHTML = '<option value="">Select SN...</option>' +
+    list.map(c => `<option value="${c.sn}">${c.sn} (${c.balance} left)</option>`).join('');
+}
+
+async function logConsumableUse() {
+  const type  = document.getElementById('clog-type').value;
+  const sn    = document.getElementById('clog-sn').value;
+  const date  = document.getElementById('clog-date').value;
+  const cas   = document.getElementById('clog-case').value.trim();
+  const staff = document.getElementById('clog-staff').value;
+
+  if (!type || !sn || !date || !cas) { showMsg('clog-msg', 'Please fill in type, SN, date and case.', 'err'); return; }
+
+  const cons = state.consumables.find(c => c.sn === sn);
+  if (!cons) { showMsg('clog-msg', 'Consumable not found.', 'err'); return; }
+  if (cons.balance <= 0) { showMsg('clog-msg', 'No stock remaining.', 'err'); return; }
+
+  const newBalance = cons.balance - 1;
+
+  setBtn('btn-log-cons-use', true);
+  try {
+    await api({ action: 'saveConsumable', SN: cons.sn, Type: cons.type, Balance: newBalance, MaxBalance: cons.maxBalance, Expiry: cons.expiry, LastUsed: date });
+    await api({ action: 'saveAudit', Timestamp: new Date().toISOString(), Event: 'Consumable use logged', Type: cons.type, SN: cons.sn, Staff: staff, Notes: `Case: ${cas} | Balance: ${newBalance}/${cons.maxBalance}` });
+
+    cons.balance  = newBalance;
+    cons.lastUsed = date;
+
+    setSyncStatus('ok', 'Saved · ' + fmtTime());
+    if (newBalance === 0) {
+      showMsg('clog-msg', `Use recorded. ⚠ ${sn} is now out of stock.`, 'warn');
+    } else if (newBalance <= Math.ceil(cons.maxBalance * 0.2)) {
+      showMsg('clog-msg', `Use recorded. ⚠ Only ${newBalance} unit(s) remaining — consider reordering.`, 'warn');
+    } else {
+      showMsg('clog-msg', `Use recorded for ${sn}. ${newBalance} unit(s) remaining.`, 'ok');
+    }
+    populateConsumableSNDropdown();
+    if (currentSection === 'consumables') renderConsumables();
+    if (currentSection === 'dashboard')   renderDashboard();
+  } catch (e) {
+    setSyncStatus('err', 'Save failed');
+    showMsg('clog-msg', 'Failed to save. Check your connection.', 'err');
+  }
+  setBtn('btn-log-cons-use', false);
 }
 
 async function logUse() {

@@ -222,7 +222,34 @@
           </div>
         </div>
 
-        <!-- Panel 3: Undo a logged use -->
+        <!-- Panel 3: Log consumable use -->
+        <div class="panel">
+          <div class="ph"><h2>Record consumable use</h2></div>
+          <div class="pb">
+            <div class="form-grid">
+              <div class="fg">
+                <label>Consumable type</label>
+                <select id="clog-type" onchange="populateConsumableSNDropdown()"><option value="">Select type...</option></select>
+              </div>
+              <div class="fg">
+                <label>Serial / lot number</label>
+                <select id="clog-sn"><option value="">Select SN...</option></select>
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="fg"><label>Date used</label><input type="date" id="clog-date"></div>
+              <div class="fg"><label>Staff name / ID</label><input type="text" id="clog-staff" placeholder="e.g. Jim / S1234"></div>
+            </div>
+            <div class="fg" style="margin-bottom:14px">
+              <label>Case / procedure number</label>
+              <input type="text" id="clog-case" placeholder="e.g. 12345">
+            </div>
+            <button class="btn primary" id="btn-log-cons-use" onclick="logConsumableUse()">Record consumable use</button>
+            <div id="clog-msg"></div>
+          </div>
+        </div>
+
+        <!-- Panel 4: Undo a logged use -->
         <div class="panel" style="border-color:#3a2a10">
           <div class="ph" style="border-color:#3a2a10">
             <h2 style="color:var(--amber)">↩ Undo a logged use (case cancelled / instrument returned unused)</h2>
