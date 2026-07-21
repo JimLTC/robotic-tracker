@@ -389,7 +389,7 @@ function renderInstruments() {
           <td>${i.type}</td>
           <td>${sbadge(i.status)}</td>
           <td>${bar}</td>
-          <td style="color:var(--text2);font-size:12px">${i.lastUsed || '—'}</td>
+          <td style="color:var(--text2);font-size:12px">${i.lastUsed ? i.lastUsed.slice(0, 10) : '—'}</td>
           <td style="color:var(--text2);font-size:12px;max-width:200px">${i.remarks || '—'}</td>
         </tr>`;
       }).join('');
@@ -422,7 +422,7 @@ function renderConsumables() {
             <div class="ci-info">
               <div class="ci-sn">${c.sn}</div>
               ${c.expiry   ? `<div class="ci-sub">Exp: ${c.expiry.slice(0, 10)}</div>` : ''}
-              ${c.lastUsed ? `<div class="ci-sub">Last used: ${c.lastUsed}</div>` : ''}
+              ${c.lastUsed ? `<div class="ci-sub">Last used: ${c.lastUsed.slice(0, 10)}</div>` : ''}
             </div>
             <div class="ci-bar"><div class="ci-fill" style="width:${p}%;background:${bc(p)}"></div></div>
             <div class="ci-pct" style="color:${bc(p)}">${c.balance}/${c.maxBalance}</div>
