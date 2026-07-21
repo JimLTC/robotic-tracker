@@ -213,6 +213,12 @@ function fmtTime() {
   return new Date().toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit' });
 }
 
+function localTimestamp() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
 function bc(p) {
   return p <= 20 ? 'var(--red)' : p <= 40 ? 'var(--amber)' : 'var(--green)';
 }
@@ -434,7 +440,7 @@ function renderConsumables() {
 // ── Log use / fault forms ─────────────────────────────────────────────────────
 
 function initLogForms() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localTimestamp().slice(0, 10);
   document.getElementById('log-date').value   = today;
   document.getElementById('fault-date').value = today;
   document.getElementById('clog-date').value  = today;
@@ -514,7 +520,7 @@ async function logConsumableUse() {
   setBtn('btn-log-cons-use', true);
   try {
     await api({ action: 'saveConsumable', SN: cons.sn, Type: cons.type, Balance: newBalance, MaxBalance: cons.maxBalance, Expiry: cons.expiry, LastUsed: date });
-    await api({ action: 'saveAudit', Timestamp: new Date().toISOString(), Event: 'Consumable use logged', Type: cons.type, SN: cons.sn, Staff: staff, Notes: `Case: ${cas} | Balance: ${newBalance}/${cons.maxBalance}` });
+    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Consumable use logged', Type: cons.type, SN: cons.sn, Staff: staff, Notes: `Case: ${cas} | Balance: ${newBalance}/${cons.maxBalance}` });
 
     cons.balance  = newBalance;
     cons.lastUsed = date;
@@ -563,7 +569,7 @@ async function logUse() {
   try {
     await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: newStatus, UsesLeft: newUsesLeft, MaxLife: inst.maxLife, LastUsed: date, LastCase: cas, Remarks: inst.remarks });
     const auditNote = `Case: ${cas}${qty > 1 ? ` | Qty: ${qty}` : ''} | Uses left: ${newUsesLeft !== null ? newUsesLeft : 'N/A'}`;
-    await api({ action: 'saveAudit', Timestamp: new Date().toISOString(), Event: 'Use logged', Type: inst.type, SN: inst.sn, Staff: staff, Notes: auditNote });
+    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Use logged', Type: inst.type, SN: inst.sn, Staff: staff, Notes: auditNote });
 
     // Update local state only after successful write
     inst.usesLeft = newUsesLeft;
@@ -600,7 +606,7 @@ async function logFault() {
   try {
     const id = 'f' + Date.now();
     await api({ action: 'saveFault', ID: id, Date: date, Type: type, SN: sn, Kind: kind, Notes: notes, Staff: staff });
-    await api({ action: 'saveAudit', Timestamp: new Date().toISOString(), Event: 'Fault logged', Type: type, SN: sn, Staff: staff, Notes: `${kind}: ${notes}` });
+    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Fault logged', Type: type, SN: sn, Staff: staff, Notes: `${kind}: ${notes}` });
 
     state.faults.unshift({ ID: id, Date: date, Type: type, SN: sn, Kind: kind, Notes: notes, Staff: staff });
 
@@ -637,7 +643,7 @@ async function undoUse() {
   try {
     await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: newStatus, UsesLeft: newUsesLeft, MaxLife: inst.maxLife, LastUsed: '', LastCase: '', Remarks: inst.remarks });
     const auditNote = `Reason: ${reason}${notes ? ' | ' + notes : ''} | Uses now: ${newUsesLeft}/${inst.maxLife}`;
-    await api({ action: 'saveAudit', Timestamp: new Date().toISOString(), Event: 'Use REVERSED', Type: inst.type, SN: inst.sn, Staff: staff, Notes: auditNote });
+    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Use REVERSED', Type: inst.type, SN: inst.sn, Staff: staff, Notes: auditNote });
 
     inst.usesLeft = newUsesLeft;
     inst.status   = newStatus;
@@ -709,7 +715,7 @@ async function addInstrument() {
   setBtn('btn-add-instr', true);
   try {
     await api({ action: 'saveInstrument', SN: sn, Type: type, Status: status, UsesLeft: ul, MaxLife: ml, LastUsed: '', Remarks: remarks });
-    await api({ action: 'saveAudit', Timestamp: new Date().toISOString(), Event: 'Instrument added', Type: type, SN: sn, Staff: staff, Notes: `Status: ${status}${remarks ? ' | ' + remarks : ''}` });
+    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Instrument added', Type: type, SN: sn, Staff: staff, Notes: `Status: ${status}${remarks ? ' | ' + remarks : ''}` });
 
     state.instruments.push(normaliseInstrument({ SN: sn, Type: type, Status: status, UsesLeft: ul, MaxLife: ml, LastUsed: '', Remarks: remarks }));
 
@@ -744,7 +750,7 @@ async function addConsumable() {
   setBtn('btn-add-cons', true);
   try {
     await api({ action: 'saveConsumable', SN: sn, Type: type, Balance: Number(balance), MaxBalance: Number(maxBalance), Expiry: expiry, LastUsed: lastUsed });
-    await api({ action: 'saveAudit', Timestamp: new Date().toISOString(), Event: 'Consumable added', Type: type, SN: sn, Staff: staff, Notes: `Balance: ${balance}/${maxBalance}${expiry ? ' | Expiry: ' + expiry : ''}` });
+    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Consumable added', Type: type, SN: sn, Staff: staff, Notes: `Balance: ${balance}/${maxBalance}${expiry ? ' | Expiry: ' + expiry : ''}` });
 
     state.consumables.push(normaliseConsumable({ SN: sn, Type: type, Balance: Number(balance), MaxBalance: Number(maxBalance), Expiry: expiry, LastUsed: lastUsed }));
 
@@ -781,7 +787,7 @@ async function condemnInstrument() {
   setBtn('btn-condemn', true);
   try {
     await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: 'Condemned', UsesLeft: inst.usesLeft, MaxLife: inst.maxLife, LastUsed: inst.lastUsed, LastCase: inst.lastCase, Remarks: inst.remarks });
-    await api({ action: 'saveAudit', Timestamp: new Date().toISOString(), Event: 'Instrument condemned', Type: inst.type, SN: inst.sn, Staff: staff, Notes: `Reason: ${reason}${notes ? ' | ' + notes : ''}` });
+    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Instrument condemned', Type: inst.type, SN: inst.sn, Staff: staff, Notes: `Reason: ${reason}${notes ? ' | ' + notes : ''}` });
 
     inst.status = 'Condemned';
 
@@ -896,13 +902,13 @@ function csv(val) {
 function exportAll() {
   const rows = ['SN,Type,Status,Uses Left,Max Life,Last Used,Remarks',
     ...state.instruments.map(i => [i.sn, i.type, i.status, i.usesLeft, i.maxLife, i.lastUsed, i.remarks].map(csv).join(','))];
-  dl(rows.join('\n'), 'instruments_' + new Date().toISOString().slice(0, 10) + '.csv');
+  dl(rows.join('\n'), 'instruments_' + localTimestamp().slice(0, 10) + '.csv');
 }
 
 function exportAudit() {
   const rows = ['Timestamp,Event,Type,SN,Staff,Notes',
     ...filteredAuditRows().map(r => [r.Timestamp || r.timestamp, r.Event || r.event, r.Type || r.type, r.SN || r.sn, r.Staff || r.staff, r.Notes || r.notes].map(csv).join(','))];
-  dl(rows.join('\n'), 'audit_' + new Date().toISOString().slice(0, 10) + '.csv');
+  dl(rows.join('\n'), 'audit_' + localTimestamp().slice(0, 10) + '.csv');
 }
 
 // ── Clock ─────────────────────────────────────────────────────────────────────
