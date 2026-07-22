@@ -62,7 +62,7 @@ function setSyncStatus(status, text) {
 function normaliseInstrument(r) {
   return {
     sn:       r.SN       || r.sn       || '',
-    type:     r.Type     || r.type     || '',
+    type:     (r.Type     || r.type     || '').trim(),
     status:   r.Status   || r.status   || '',
     usesLeft: (r.UsesLeft === null || r.UsesLeft === '' || r.UsesLeft === undefined) ? null : Number(r.UsesLeft),
     maxLife:  (r.MaxLife  === null || r.MaxLife  === '' || r.MaxLife  === undefined) ? null : Number(r.MaxLife),
@@ -373,7 +373,7 @@ function renderInstruments() {
   const types = [...new Set(state.instruments.map(i => i.type))].sort();
   const td = document.getElementById('filt-type');
   const cur = td.value;
-  td.innerHTML = '<option value="">All types</option>' + types.map(t => `<option${t === cur ? ' selected' : ''}>${t}</option>`).join('');
+  td.innerHTML = '<option value="">All types</option>' + types.map(t => `<option value="${t}"${t === cur ? ' selected' : ''}>${t}</option>`).join('');
 
   const ft = td.value;
   const fs = document.getElementById('filt-status').value;
@@ -407,7 +407,7 @@ function renderConsumables() {
   const types = [...new Set(state.consumables.map(c => c.type))].sort();
   const td = document.getElementById('cfilt-type');
   const cur = td.value;
-  td.innerHTML = '<option value="">All types</option>' + types.map(t => `<option${t === cur ? ' selected' : ''}>${t}</option>`).join('');
+  td.innerHTML = '<option value="">All types</option>' + types.map(t => `<option value="${t}"${t === cur ? ' selected' : ''}>${t}</option>`).join('');
 
   const ft = td.value;
   const showDepleted = document.getElementById('cfilt-show-depleted').checked;
@@ -811,7 +811,7 @@ function renderFaults() {
   const types = [...new Set(state.faults.map(f => f.Type || f.type || ''))].sort();
   const fd    = document.getElementById('ffilt-type');
   const cur   = fd.value;
-  fd.innerHTML = '<option value="">All types</option>' + types.map(t => `<option${t === cur ? ' selected' : ''}>${t}</option>`).join('');
+  fd.innerHTML = '<option value="">All types</option>' + types.map(t => `<option value="${t}"${t === cur ? ' selected' : ''}>${t}</option>`).join('');
 
   const ft = fd.value;
   const fk = document.getElementById('ffilt-kind').value;
@@ -866,7 +866,7 @@ function renderAudit() {
   const types = [...new Set(state.audit.map(r => r.Type || r.type || ''))].filter(Boolean).sort();
   const td  = document.getElementById('afilt-type');
   const curT = td.value;
-  td.innerHTML = '<option value="">All types</option>' + types.map(t => `<option${t === curT ? ' selected' : ''}>${t}</option>`).join('');
+  td.innerHTML = '<option value="">All types</option>' + types.map(t => `<option value="${t}"${t === curT ? ' selected' : ''}>${t}</option>`).join('');
 
   const rows = filteredAuditRows();
 
