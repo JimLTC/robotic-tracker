@@ -66,7 +66,7 @@ function normaliseInstrument(r) {
     status:   r.Status   || r.status   || '',
     usesLeft: (r.UsesLeft === null || r.UsesLeft === '' || r.UsesLeft === undefined) ? null : Number(r.UsesLeft),
     maxLife:  (r.MaxLife  === null || r.MaxLife  === '' || r.MaxLife  === undefined) ? null : Number(r.MaxLife),
-    lastUsed: r.LastUsed  || r.lastUsed  || '',
+    lastUsed: parseSheetDate(r.LastUsed  || r.lastUsed  || ''),
     lastCase: r.LastCase  || r.lastCase  || '',
     remarks:  r.Remarks   || r.remarks   || '',
   };
@@ -78,8 +78,8 @@ function normaliseConsumable(r) {
     type:       r.Type       || r.type       || '',
     balance:    Number(r.Balance    ?? r.balance    ?? 0),
     maxBalance: Number(r.MaxBalance ?? r.maxBalance ?? 1),
-    expiry:     r.Expiry     || r.expiry     || '',
-    lastUsed:   r.LastUsed   || r.lastUsed   || '',
+    expiry:     parseSheetDate(r.Expiry     || r.expiry     || ''),
+    lastUsed:   parseSheetDate(r.LastUsed   || r.lastUsed   || ''),
   };
 }
 
@@ -219,6 +219,15 @@ function localTimestamp() {
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
+// Converts any date string from Sheets (may be UTC ISO timestamp) to local YYYY-MM-DD
+function parseSheetDate(str) {
+  if (!str) return '';
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return str;
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 function bc(p) {
   return p <= 20 ? 'var(--red)' : p <= 40 ? 'var(--amber)' : 'var(--green)';
 }
@@ -318,7 +327,7 @@ function renderDashboard() {
         <div class="fi-top">
           <span class="fi-sn">${f.SN || f.sn}</span>
           ${fbadge(f.Kind || f.kind)}
-          <span class="fi-date">${f.Date || f.date}</span>
+          <span class="fi-date">${parseSheetDate(f.Date || f.date || '')}</span>
         </div>
         <div class="fi-note">${f.Notes || f.notes || '—'}</div>
       </div>`).join('');
@@ -840,7 +849,7 @@ function renderFaults() {
           <span class="fi-sn">${f.SN || f.sn}</span>
           <span style="font-size:11px;color:var(--text3)">${f.Type || f.type}</span>
           ${fbadge(f.Kind || f.kind)}
-          <span class="fi-date">${f.Date || f.date}</span>
+          <span class="fi-date">${parseSheetDate(f.Date || f.date || '')}</span>
         </div>
         <div class="fi-note">${f.Notes || f.notes || '—'}${(f.Staff || f.staff) ? ' — ' + (f.Staff || f.staff) : ''}</div>
       </div>`).join('');
