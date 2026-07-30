@@ -500,6 +500,13 @@ function populateConsumableSNDropdown() {
   const list = state.consumables.filter(c => c.type === type && c.balance > 0);
   document.getElementById('clog-sn').innerHTML = '<option value="">Select SN...</option>' +
     list.map(c => `<option value="${c.sn}">${c.sn} (${c.balance} left)</option>`).join('');
+
+  const isSureForm = type.toLowerCase().includes('sureform');
+  document.getElementById('clog-reload-section').style.display = isSureForm ? '' : 'none';
+  if (!isSureForm) {
+    document.getElementById('clog-reload-color').value = '';
+    document.getElementById('clog-reload-qty').value   = '1';
+  }
 }
 
 async function logConsumableUse() {
@@ -509,7 +516,12 @@ async function logConsumableUse() {
   const cas   = document.getElementById('clog-case').value.trim();
   const staff = document.getElementById('clog-staff').value;
 
+  const isSureForm    = type.toLowerCase().includes('sureform');
+  const reloadColor   = isSureForm ? document.getElementById('clog-reload-color').value : '';
+  const reloadQty     = isSureForm ? Math.max(1, parseInt(document.getElementById('clog-reload-qty').value) || 1) : null;
+
   if (!type || !sn || !date || !cas) { showMsg('clog-msg', 'Please fill in type, SN, date and case.', 'err'); return; }
+  if (isSureForm && !reloadColor) { showMsg('clog-msg', 'Please select a reload colour.', 'err'); return; }
 
   const cons = state.consumables.find(c => c.sn === sn);
   if (!cons) { showMsg('clog-msg', 'Consumable not found.', 'err'); return; }
@@ -520,7 +532,8 @@ async function logConsumableUse() {
   setBtn('btn-log-cons-use', true);
   try {
     await api({ action: 'saveConsumable', SN: cons.sn, Type: cons.type, Balance: newBalance, MaxBalance: cons.maxBalance, Expiry: cons.expiry, LastUsed: date });
-    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Consumable use logged', Type: cons.type, SN: cons.sn, Staff: staff, Notes: `Case: ${cas} | Balance: ${newBalance}/${cons.maxBalance}` });
+    const auditNotes = `Case: ${cas} | Balance: ${newBalance}/${cons.maxBalance}${isSureForm ? ` | Reload: ${reloadColor} ×${reloadQty}` : ''}`;
+    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Consumable use logged', Type: cons.type, SN: cons.sn, Staff: staff, Notes: auditNotes });
 
     cons.balance  = newBalance;
     cons.lastUsed = date;

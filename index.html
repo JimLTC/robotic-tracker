@@ -248,6 +248,24 @@
               <label>Case / procedure number</label>
               <input type="text" id="clog-case" placeholder="e.g. 12345">
             </div>
+            <div id="clog-reload-section" style="display:none;margin-bottom:14px;padding:12px;background:var(--surface2);border-radius:6px">
+              <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Reload details</div>
+              <div class="form-grid">
+                <div class="fg">
+                  <label>Reload colour</label>
+                  <select id="clog-reload-color">
+                    <option value="">Select colour...</option>
+                    <option value="Green">Green</option>
+                    <option value="Blue">Blue</option>
+                    <option value="Black">Black</option>
+                  </select>
+                </div>
+                <div class="fg">
+                  <label>Reloads used</label>
+                  <input type="number" id="clog-reload-qty" min="1" value="1" style="width:80px">
+                </div>
+              </div>
+            </div>
             <button class="btn primary" id="btn-log-cons-use" onclick="logConsumableUse()">Record consumable use</button>
             <div id="clog-msg"></div>
           </div>
