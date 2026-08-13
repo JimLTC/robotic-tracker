@@ -409,7 +409,46 @@
           </div>
         </div>
 
-        <!-- Panel 3: Retire / condemn instrument -->
+        <!-- Panel 3: Change instrument status -->
+        <div class="panel">
+          <div class="ph"><h2>Change instrument status</h2></div>
+          <div class="pb">
+            <div class="form-grid">
+              <div class="fg">
+                <label>Instrument type</label>
+                <select id="mstatus-type" onchange="populateStatusChangeSN()"><option value="">Select type...</option></select>
+              </div>
+              <div class="fg">
+                <label>Serial number</label>
+                <select id="mstatus-sn"><option value="">Select SN...</option></select>
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="fg">
+                <label>New status</label>
+                <select id="mstatus-new">
+                  <option value="">Select new status...</option>
+                  <option>Circulation</option>
+                  <option>SB Instrument</option>
+                  <option>URO Set</option>
+                  <option>Non-sterile</option>
+                </select>
+              </div>
+              <div class="fg">
+                <label>Changed by</label>
+                <input type="text" id="mstatus-staff" placeholder="Staff name / ID">
+              </div>
+            </div>
+            <div class="fg" style="margin-bottom:14px">
+              <label>Reason (optional)</label>
+              <input type="text" id="mstatus-reason" placeholder="e.g. Transferred to URO set">
+            </div>
+            <button class="btn primary" id="btn-status-change" onclick="changeInstrumentStatus()">Update status</button>
+            <div id="mstatus-msg"></div>
+          </div>
+        </div>
+
+        <!-- Panel 4: Retire / condemn instrument -->
         <div class="panel" style="border-color:#3d1515">
           <div class="ph" style="border-color:#3d1515">
             <h2 style="color:var(--red)">⚑ Retire / condemn instrument — this action is permanent</h2>

@@ -689,10 +689,12 @@ async function undoUse() {
 function initManageForms() {
   const typeNames = Object.keys(INSTRUMENT_TYPES);
   const typeOpts  = '<option value="">Select type...</option>' + typeNames.map(t => `<option>${t}</option>`).join('');
-  document.getElementById('mnew-type').innerHTML  = typeOpts;
-  document.getElementById('mcnd-type').innerHTML  = typeOpts;
-  document.getElementById('mcnd-sn').innerHTML    = '<option value="">Select SN...</option>';
-  document.getElementById('mcon-type').innerHTML  = '<option value="">Select type...</option>' + CONSUMABLE_TYPES.map(t => `<option>${t}</option>`).join('');
+  document.getElementById('mnew-type').innerHTML    = typeOpts;
+  document.getElementById('mcnd-type').innerHTML    = typeOpts;
+  document.getElementById('mstatus-type').innerHTML = typeOpts;
+  document.getElementById('mcnd-sn').innerHTML      = '<option value="">Select SN...</option>';
+  document.getElementById('mstatus-sn').innerHTML   = '<option value="">Select SN...</option>';
+  document.getElementById('mcon-type').innerHTML    = '<option value="">Select type...</option>' + CONSUMABLE_TYPES.map(t => `<option>${t}</option>`).join('');
 }
 
 function autoFillMaxLife() {
@@ -714,6 +716,51 @@ function populateCondemnSN() {
   );
   document.getElementById('mcnd-sn').innerHTML = '<option value="">Select SN...</option>' +
     active.map(i => `<option value="${i.sn}">${i.sn} — ${i.status}</option>`).join('');
+}
+
+function populateStatusChangeSN() {
+  const t = document.getElementById('mstatus-type').value;
+  const list = state.instruments.filter(i => i.type === t && i.status !== 'Condemned');
+  document.getElementById('mstatus-sn').innerHTML = '<option value="">Select SN...</option>' +
+    list.map(i => `<option value="${i.sn}">${i.sn} — currently ${i.status}</option>`).join('');
+}
+
+async function changeInstrumentStatus() {
+  const sn      = document.getElementById('mstatus-sn').value;
+  const newStat = document.getElementById('mstatus-new').value;
+  const staff   = document.getElementById('mstatus-staff').value.trim();
+  const reason  = document.getElementById('mstatus-reason').value.trim();
+
+  if (!sn || !newStat) { showMsg('mstatus-msg', 'Please select an instrument and a new status.', 'err'); return; }
+  if (!staff) { showMsg('mstatus-msg', 'Please enter the staff name.', 'err'); return; }
+
+  const inst = state.instruments.find(i => i.sn === sn);
+  if (!inst) { showMsg('mstatus-msg', 'Instrument not found.', 'err'); return; }
+  if (inst.status === newStat) { showMsg('mstatus-msg', `${sn} is already set to "${newStat}".`, 'err'); return; }
+
+  const oldStat = inst.status;
+  setBtn('btn-status-change', true);
+  try {
+    await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: newStat, UsesLeft: inst.usesLeft, MaxLife: inst.maxLife, LastUsed: inst.lastUsed, LastCase: inst.lastCase, Remarks: inst.remarks });
+    const auditNote = `Status: ${oldStat} → ${newStat}${reason ? ' | ' + reason : ''}`;
+    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Status changed', Type: inst.type, SN: inst.sn, Staff: staff, Notes: auditNote });
+
+    inst.status = newStat;
+
+    setSyncStatus('ok', 'Saved · ' + fmtTime());
+    showMsg('mstatus-msg', `${sn} status updated: ${oldStat} → ${newStat}.`, 'ok');
+    document.getElementById('mstatus-sn').value    = '';
+    document.getElementById('mstatus-new').value   = '';
+    document.getElementById('mstatus-staff').value = '';
+    document.getElementById('mstatus-reason').value = '';
+    populateStatusChangeSN();
+    if (currentSection === 'instruments') renderInstruments();
+    if (currentSection === 'dashboard')   renderDashboard();
+  } catch (e) {
+    setSyncStatus('err', 'Save failed');
+    showMsg('mstatus-msg', 'Failed to save. Check your connection.', 'err');
+  }
+  setBtn('btn-status-change', false);
 }
 
 async function addInstrument() {
