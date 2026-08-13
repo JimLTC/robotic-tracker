@@ -689,14 +689,12 @@ async function undoUse() {
 function initManageForms() {
   const typeNames = Object.keys(INSTRUMENT_TYPES);
   const typeOpts  = '<option value="">Select type...</option>' + typeNames.map(t => `<option>${t}</option>`).join('');
-  document.getElementById('mnew-type').innerHTML    = typeOpts;
-  document.getElementById('mcnd-type').innerHTML    = typeOpts;
-  document.getElementById('mcnd-sn').innerHTML      = '<option value="">Select SN...</option>';
+  document.getElementById('mcnd-type').innerHTML = typeOpts;
+  document.getElementById('mcnd-sn').innerHTML   = '<option value="">Select SN...</option>';
 
   const allTypes = [...new Set(state.instruments.filter(i => i.status !== 'Condemned').map(i => i.type))].sort();
   document.getElementById('mstatus-type').innerHTML = '<option value="">Select type...</option>' + allTypes.map(t => `<option>${t}</option>`).join('');
   document.getElementById('mstatus-sn').innerHTML   = '<option value="">Select SN...</option>';
-  document.getElementById('mcon-type').innerHTML    = '<option value="">Select type...</option>' + CONSUMABLE_TYPES.map(t => `<option>${t}</option>`).join('');
 }
 
 function autoFillMaxLife() {
