@@ -47,6 +47,18 @@ async function api(params) {
   return res.json();
 }
 
+// Retry audit write up to 3 times; returns true on success, false if all attempts fail.
+async function saveAuditRobust(payload) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      if (attempt > 0) await new Promise(r => setTimeout(r, attempt * 1500));
+      await api({ action: 'saveAudit', ...payload });
+      return true;
+    } catch {}
+  }
+  return false;
+}
+
 // ── Sync status ───────────────────────────────────────────────────────────────
 
 function setSyncStatus(status, text) {
@@ -537,16 +549,42 @@ async function logConsumableUse() {
   if (cons.balance <= 0) { showMsg('clog-msg', 'No stock remaining.', 'err'); return; }
 
   const newBalance = cons.balance - 1;
+  const reloadSection = document.getElementById('clog-reload-section');
+  const isSureForm = reloadSection && reloadSection.style.display !== 'none';
+  const reloadColor = isSureForm ? document.getElementById('clog-reload-color').value : '';
+  const reloadQty   = isSureForm ? (parseInt(document.getElementById('clog-reload-qty').value) || 1) : 0;
+  if (isSureForm && !reloadColor) { showMsg('clog-msg', 'Please select the reload colour.', 'err'); return; }
+
+  let auditNote = `Case: ${cas} | Balance: ${newBalance}/${cons.maxBalance}`;
+  if (isSureForm && reloadColor) auditNote += ` | Reload: ${reloadColor} ×${reloadQty}`;
 
   setBtn('btn-log-cons-use', true);
+
+  // Step 1: save the balance — if this fails, nothing is written
   try {
     await api({ action: 'saveConsumable', SN: cons.sn, Type: cons.type, Balance: newBalance, MaxBalance: cons.maxBalance, Expiry: cons.expiry, LastUsed: date });
-    const auditNotes = `Case: ${cas} | Balance: ${newBalance}/${cons.maxBalance}${isSureForm ? ` | Reload: ${reloadColor} ×${reloadQty}` : ''}`;
-    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Consumable use logged', Type: cons.type, SN: cons.sn, Staff: staff, Notes: auditNotes });
+  } catch (e) {
+    setSyncStatus('err', 'Save failed');
+    showMsg('clog-msg', 'Failed to save. Check your connection and try again.', 'err');
+    setBtn('btn-log-cons-use', false);
+    return;
+  }
 
-    cons.balance  = newBalance;
-    cons.lastUsed = date;
+  // Balance saved — update local state
+  cons.balance  = newBalance;
+  cons.lastUsed = date;
 
+  // Step 2: save audit (retries automatically up to 3×)
+  const auditOk = await saveAuditRobust({ Timestamp: localTimestamp(), Event: 'Consumable use logged', Type: cons.type, SN: cons.sn, Staff: staff, Notes: auditNote });
+
+  populateConsumableSNDropdown();
+  if (currentSection === 'consumables') renderConsumables();
+  if (currentSection === 'dashboard')   renderDashboard();
+
+  if (!auditOk) {
+    setSyncStatus('err', 'Audit write failed');
+    showMsg('clog-msg', `⚠ AUDIT TRAIL WRITE FAILED — balance was updated but this event was NOT recorded in the audit trail. Please inform your supervisor and note manually: ${cons.type} ${sn} | Case: ${cas} | Staff: ${staff || '—'} | ${localTimestamp().slice(0, 10)}`, 'err');
+  } else {
     setSyncStatus('ok', 'Saved · ' + fmtTime());
     if (newBalance === 0) {
       showMsg('clog-msg', `Use recorded. ⚠ ${sn} is now out of stock.`, 'warn');
@@ -555,12 +593,6 @@ async function logConsumableUse() {
     } else {
       showMsg('clog-msg', `Use recorded for ${sn}. ${newBalance} unit(s) remaining.`, 'ok');
     }
-    populateConsumableSNDropdown();
-    if (currentSection === 'consumables') renderConsumables();
-    if (currentSection === 'dashboard')   renderDashboard();
-  } catch (e) {
-    setSyncStatus('err', 'Save failed');
-    showMsg('clog-msg', 'Failed to save. Check your connection.', 'err');
   }
   setBtn('btn-log-cons-use', false);
 }
@@ -586,30 +618,42 @@ async function logUse() {
 
   const newUsesLeft = inst.usesLeft !== null ? Math.max(0, inst.usesLeft - qty) : null;
   const newStatus   = newUsesLeft === 0 ? 'Complete' : inst.status;
+  const auditNote   = `Case: ${cas}${qty > 1 ? ` | Qty: ${qty}` : ''} | Uses left: ${newUsesLeft !== null ? newUsesLeft : 'N/A'}`;
 
   setBtn('btn-log-use', true);
+
+  // Step 1: save the instrument record — if this fails, nothing is written
   try {
     await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: newStatus, UsesLeft: newUsesLeft, MaxLife: inst.maxLife, LastUsed: date, LastCase: cas, Remarks: inst.remarks });
-    const auditNote = `Case: ${cas}${qty > 1 ? ` | Qty: ${qty}` : ''} | Uses left: ${newUsesLeft !== null ? newUsesLeft : 'N/A'}`;
-    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Use logged', Type: inst.type, SN: inst.sn, Staff: staff, Notes: auditNote });
+  } catch (e) {
+    setSyncStatus('err', 'Save failed');
+    showMsg('log-msg', 'Failed to save. Check your connection and try again.', 'err');
+    setBtn('btn-log-use', false);
+    return;
+  }
 
-    // Update local state only after successful write
-    inst.usesLeft = newUsesLeft;
-    inst.lastUsed = date;
-    inst.lastCase = cas;
-    inst.status   = newStatus;
+  // Instrument saved — update local state
+  inst.usesLeft = newUsesLeft;
+  inst.lastUsed = date;
+  inst.lastCase = cas;
+  inst.status   = newStatus;
 
+  // Step 2: save audit (retries automatically up to 3×)
+  const auditOk = await saveAuditRobust({ Timestamp: localTimestamp(), Event: 'Use logged', Type: inst.type, SN: inst.sn, Staff: staff, Notes: auditNote });
+
+  populateSNDropdown();
+  if (currentSection === 'dashboard') renderDashboard();
+
+  if (!auditOk) {
+    setSyncStatus('err', 'Audit write failed');
+    showMsg('log-msg', `⚠ AUDIT TRAIL WRITE FAILED — instrument use was saved but this event was NOT recorded in the audit trail. Please inform your supervisor and note manually: ${inst.type} ${sn} | Case: ${cas} | Staff: ${staff || '—'} | ${localTimestamp().slice(0, 10)}`, 'err');
+  } else {
     setSyncStatus('ok', 'Saved · ' + fmtTime());
     if (inst.usesLeft !== null && inst.usesLeft <= 2) {
       showMsg('log-msg', `Recorded. ⚠ Warning: ${inst.usesLeft} use(s) remaining — consider replacement.`, 'warn');
     } else {
       showMsg('log-msg', `Use recorded for ${sn}.`, 'ok');
     }
-    populateSNDropdown();
-    if (currentSection === 'dashboard') renderDashboard();
-  } catch (e) {
-    setSyncStatus('err', 'Save failed');
-    showMsg('log-msg', 'Failed to save. Check your connection.', 'err');
   }
   setBtn('btn-log-use', false);
 }
@@ -625,21 +669,33 @@ async function logFault() {
   if (!type || !sn || !kind || !date) { showMsg('fault-msg', 'Please fill in type, SN, fault type and date.', 'err'); return; }
 
   setBtn('btn-log-fault', true);
+  const id = 'f' + Date.now();
+
+  // Step 1: save the fault record
   try {
-    const id = 'f' + Date.now();
     await api({ action: 'saveFault', ID: id, Date: date, Type: type, SN: sn, Kind: kind, Notes: notes, Staff: staff });
-    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Fault logged', Type: type, SN: sn, Staff: staff, Notes: `${kind}: ${notes}` });
-
-    state.faults.unshift({ ID: id, Date: date, Type: type, SN: sn, Kind: kind, Notes: notes, Staff: staff });
-
-    setSyncStatus('ok', 'Saved · ' + fmtTime());
-    showMsg('fault-msg', 'Fault recorded.', 'ok');
-    document.getElementById('fault-notes').value = '';
-    document.getElementById('fault-staff').value = '';
-    updateFaultsBadge();
   } catch (e) {
     setSyncStatus('err', 'Save failed');
-    showMsg('fault-msg', 'Failed to save. Check your connection.', 'err');
+    showMsg('fault-msg', 'Failed to save. Check your connection and try again.', 'err');
+    setBtn('btn-log-fault', false);
+    return;
+  }
+
+  state.faults.unshift({ ID: id, Date: date, Type: type, SN: sn, Kind: kind, Notes: notes, Staff: staff });
+
+  // Step 2: save audit
+  const auditOk = await saveAuditRobust({ Timestamp: localTimestamp(), Event: 'Fault logged', Type: type, SN: sn, Staff: staff, Notes: `${kind}: ${notes}` });
+
+  document.getElementById('fault-notes').value = '';
+  document.getElementById('fault-staff').value = '';
+  updateFaultsBadge();
+
+  if (!auditOk) {
+    setSyncStatus('err', 'Audit write failed');
+    showMsg('fault-msg', `⚠ AUDIT TRAIL WRITE FAILED — fault was recorded but this event was NOT added to the audit trail. Please inform your supervisor and note manually: ${type} ${sn} | ${kind} | Staff: ${staff || '—'} | ${localTimestamp().slice(0, 10)}`, 'err');
+  } else {
+    setSyncStatus('ok', 'Saved · ' + fmtTime());
+    showMsg('fault-msg', 'Fault recorded.', 'ok');
   }
   setBtn('btn-log-fault', false);
 }
@@ -662,24 +718,36 @@ async function undoUse() {
   const newStatus    = inst.status === 'Complete' && newUsesLeft > 0 ? 'Circulation' : inst.status;
 
   setBtn('btn-undo', true);
+  const auditNote = `Reason: ${reason}${notes ? ' | ' + notes : ''} | Uses now: ${newUsesLeft}/${inst.maxLife}`;
+
+  // Step 1: save instrument record
   try {
     await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: newStatus, UsesLeft: newUsesLeft, MaxLife: inst.maxLife, LastUsed: '', LastCase: '', Remarks: inst.remarks });
-    const auditNote = `Reason: ${reason}${notes ? ' | ' + notes : ''} | Uses now: ${newUsesLeft}/${inst.maxLife}`;
-    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Use REVERSED', Type: inst.type, SN: inst.sn, Staff: staff, Notes: auditNote });
-
-    inst.usesLeft = newUsesLeft;
-    inst.status   = newStatus;
-    inst.lastUsed = '';
-    inst.lastCase = '';
-
-    setSyncStatus('ok', 'Saved · ' + fmtTime());
-    showMsg('undo-msg', `Done. ${sn} returned — now ${inst.usesLeft}/${inst.maxLife} uses remaining.`, 'ok');
-    document.getElementById('undo-notes').value = '';
-    document.getElementById('undo-staff').value = '';
-    populateUndoSN();
   } catch (e) {
     setSyncStatus('err', 'Save failed');
-    showMsg('undo-msg', 'Failed to save. Check your connection.', 'err');
+    showMsg('undo-msg', 'Failed to save. Check your connection and try again.', 'err');
+    setBtn('btn-undo', false);
+    return;
+  }
+
+  inst.usesLeft = newUsesLeft;
+  inst.status   = newStatus;
+  inst.lastUsed = '';
+  inst.lastCase = '';
+
+  // Step 2: save audit
+  const auditOk = await saveAuditRobust({ Timestamp: localTimestamp(), Event: 'Use REVERSED', Type: inst.type, SN: inst.sn, Staff: staff, Notes: auditNote });
+
+  document.getElementById('undo-notes').value = '';
+  document.getElementById('undo-staff').value = '';
+  populateUndoSN();
+
+  if (!auditOk) {
+    setSyncStatus('err', 'Audit write failed');
+    showMsg('undo-msg', `⚠ AUDIT TRAIL WRITE FAILED — use reversal was saved but NOT recorded in the audit trail. Please inform your supervisor and note manually: ${inst.type} ${sn} reversed | Staff: ${staff || '—'} | ${localTimestamp().slice(0, 10)}`, 'err');
+  } else {
+    setSyncStatus('ok', 'Saved · ' + fmtTime());
+    showMsg('undo-msg', `Done. ${sn} returned — now ${inst.usesLeft}/${inst.maxLife} uses remaining.`, 'ok');
   }
   setBtn('btn-undo', false);
 }
@@ -738,27 +806,37 @@ async function changeInstrumentStatus() {
   if (!inst) { showMsg('mstatus-msg', 'Instrument not found.', 'err'); return; }
   if (inst.status === newStat) { showMsg('mstatus-msg', `${sn} is already set to "${newStat}".`, 'err'); return; }
 
-  const oldStat = inst.status;
+  const oldStat   = inst.status;
+  const auditNote = `Status: ${oldStat} → ${newStat}${reason ? ' | ' + reason : ''}`;
+
   setBtn('btn-status-change', true);
   try {
     await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: newStat, UsesLeft: inst.usesLeft, MaxLife: inst.maxLife, LastUsed: inst.lastUsed, LastCase: inst.lastCase, Remarks: inst.remarks });
-    const auditNote = `Status: ${oldStat} → ${newStat}${reason ? ' | ' + reason : ''}`;
-    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Status changed', Type: inst.type, SN: inst.sn, Staff: staff, Notes: auditNote });
-
-    inst.status = newStat;
-
-    setSyncStatus('ok', 'Saved · ' + fmtTime());
-    showMsg('mstatus-msg', `${sn} status updated: ${oldStat} → ${newStat}.`, 'ok');
-    document.getElementById('mstatus-sn').value    = '';
-    document.getElementById('mstatus-new').value   = '';
-    document.getElementById('mstatus-staff').value = '';
-    document.getElementById('mstatus-reason').value = '';
-    populateStatusChangeSN();
-    if (currentSection === 'instruments') renderInstruments();
-    if (currentSection === 'dashboard')   renderDashboard();
   } catch (e) {
     setSyncStatus('err', 'Save failed');
-    showMsg('mstatus-msg', 'Failed to save. Check your connection.', 'err');
+    showMsg('mstatus-msg', 'Failed to save. Check your connection and try again.', 'err');
+    setBtn('btn-status-change', false);
+    return;
+  }
+
+  inst.status = newStat;
+
+  const auditOk = await saveAuditRobust({ Timestamp: localTimestamp(), Event: 'Status changed', Type: inst.type, SN: inst.sn, Staff: staff, Notes: auditNote });
+
+  document.getElementById('mstatus-sn').value     = '';
+  document.getElementById('mstatus-new').value    = '';
+  document.getElementById('mstatus-staff').value  = '';
+  document.getElementById('mstatus-reason').value = '';
+  populateStatusChangeSN();
+  if (currentSection === 'instruments') renderInstruments();
+  if (currentSection === 'dashboard')   renderDashboard();
+
+  if (!auditOk) {
+    setSyncStatus('err', 'Audit write failed');
+    showMsg('mstatus-msg', `${sn} status changed to ${newStat} but ⚠ AUDIT TRAIL WRITE FAILED. Note manually: ${inst.type} ${sn} | ${oldStat} → ${newStat} | Staff: ${staff} | ${localTimestamp().slice(0, 10)}`, 'err');
+  } else {
+    setSyncStatus('ok', 'Saved · ' + fmtTime());
+    showMsg('mstatus-msg', `${sn} status updated: ${oldStat} → ${newStat}.`, 'ok');
   }
   setBtn('btn-status-change', false);
 }
@@ -784,22 +862,31 @@ async function addInstrument() {
   setBtn('btn-add-instr', true);
   try {
     await api({ action: 'saveInstrument', SN: sn, Type: type, Status: status, UsesLeft: ul, MaxLife: ml, LastUsed: '', Remarks: remarks });
-    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Instrument added', Type: type, SN: sn, Staff: staff, Notes: `Status: ${status}${remarks ? ' | ' + remarks : ''}` });
-
-    state.instruments.push(normaliseInstrument({ SN: sn, Type: type, Status: status, UsesLeft: ul, MaxLife: ml, LastUsed: '', Remarks: remarks }));
-
-    setSyncStatus('ok', 'Saved · ' + fmtTime());
-    showMsg('mnew-msg', `Instrument ${sn} added successfully.`, 'ok');
-    document.getElementById('mnew-sn').value      = '';
-    document.getElementById('mnew-remarks').value = '';
-    document.getElementById('mnew-staff').value   = '';
-    document.getElementById('mnew-maxlife').value  = '';
-    document.getElementById('mnew-usesleft').value = '';
-    document.getElementById('mnew-type').value     = '';
-    document.getElementById('mnew-status').value   = '';
   } catch (e) {
     setSyncStatus('err', 'Save failed');
-    showMsg('mnew-msg', 'Failed to save. Check your connection.', 'err');
+    showMsg('mnew-msg', 'Failed to save. Check your connection and try again.', 'err');
+    setBtn('btn-add-instr', false);
+    return;
+  }
+
+  state.instruments.push(normaliseInstrument({ SN: sn, Type: type, Status: status, UsesLeft: ul, MaxLife: ml, LastUsed: '', Remarks: remarks }));
+
+  const auditOk = await saveAuditRobust({ Timestamp: localTimestamp(), Event: 'Instrument added', Type: type, SN: sn, Staff: staff, Notes: `Status: ${status}${remarks ? ' | ' + remarks : ''}` });
+
+  document.getElementById('mnew-sn').value      = '';
+  document.getElementById('mnew-remarks').value = '';
+  document.getElementById('mnew-staff').value   = '';
+  document.getElementById('mnew-maxlife').value  = '';
+  document.getElementById('mnew-usesleft').value = '';
+  document.getElementById('mnew-type').value     = '';
+  document.getElementById('mnew-status').value   = '';
+
+  if (!auditOk) {
+    setSyncStatus('err', 'Audit write failed');
+    showMsg('mnew-msg', `Instrument ${sn} added but ⚠ AUDIT TRAIL WRITE FAILED. Note manually: ${type} ${sn} added | Staff: ${staff} | ${localTimestamp().slice(0, 10)}`, 'err');
+  } else {
+    setSyncStatus('ok', 'Saved · ' + fmtTime());
+    showMsg('mnew-msg', `Instrument ${sn} added successfully.`, 'ok');
   }
   setBtn('btn-add-instr', false);
 }
@@ -819,22 +906,31 @@ async function addConsumable() {
   setBtn('btn-add-cons', true);
   try {
     await api({ action: 'saveConsumable', SN: sn, Type: type, Balance: Number(balance), MaxBalance: Number(maxBalance), Expiry: expiry, LastUsed: lastUsed });
-    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Consumable added', Type: type, SN: sn, Staff: staff, Notes: `Balance: ${balance}/${maxBalance}${expiry ? ' | Expiry: ' + expiry : ''}` });
-
-    state.consumables.push(normaliseConsumable({ SN: sn, Type: type, Balance: Number(balance), MaxBalance: Number(maxBalance), Expiry: expiry, LastUsed: lastUsed }));
-
-    setSyncStatus('ok', 'Saved · ' + fmtTime());
-    showMsg('mcon-msg', `Consumable ${sn} added.`, 'ok');
-    document.getElementById('mcon-sn').value         = '';
-    document.getElementById('mcon-balance').value    = '';
-    document.getElementById('mcon-maxbalance').value = '';
-    document.getElementById('mcon-expiry').value     = '';
-    document.getElementById('mcon-lastused').value   = '';
-    document.getElementById('mcon-staff').value      = '';
-    document.getElementById('mcon-type').value       = '';
   } catch (e) {
     setSyncStatus('err', 'Save failed');
-    showMsg('mcon-msg', 'Failed to save. Check your connection.', 'err');
+    showMsg('mcon-msg', 'Failed to save. Check your connection and try again.', 'err');
+    setBtn('btn-add-cons', false);
+    return;
+  }
+
+  state.consumables.push(normaliseConsumable({ SN: sn, Type: type, Balance: Number(balance), MaxBalance: Number(maxBalance), Expiry: expiry, LastUsed: lastUsed }));
+
+  const auditOk = await saveAuditRobust({ Timestamp: localTimestamp(), Event: 'Consumable added', Type: type, SN: sn, Staff: staff, Notes: `Balance: ${balance}/${maxBalance}${expiry ? ' | Expiry: ' + expiry : ''}` });
+
+  document.getElementById('mcon-sn').value         = '';
+  document.getElementById('mcon-balance').value    = '';
+  document.getElementById('mcon-maxbalance').value = '';
+  document.getElementById('mcon-expiry').value     = '';
+  document.getElementById('mcon-lastused').value   = '';
+  document.getElementById('mcon-staff').value      = '';
+  document.getElementById('mcon-type').value       = '';
+
+  if (!auditOk) {
+    setSyncStatus('err', 'Audit write failed');
+    showMsg('mcon-msg', `Consumable ${sn} added but ⚠ AUDIT TRAIL WRITE FAILED. Note manually: ${type} ${sn} added | Staff: ${staff} | ${localTimestamp().slice(0, 10)}`, 'err');
+  } else {
+    setSyncStatus('ok', 'Saved · ' + fmtTime());
+    showMsg('mcon-msg', `Consumable ${sn} added.`, 'ok');
   }
   setBtn('btn-add-cons', false);
 }
@@ -854,22 +950,33 @@ async function condemnInstrument() {
   const prevStatus = inst.status;
 
   setBtn('btn-condemn', true);
+
+  // Step 1: update instrument status
   try {
     await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: 'Condemned', UsesLeft: inst.usesLeft, MaxLife: inst.maxLife, LastUsed: inst.lastUsed, LastCase: inst.lastCase, Remarks: inst.remarks });
-    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Instrument condemned', Type: inst.type, SN: inst.sn, Staff: staff, Notes: `Reason: ${reason}${notes ? ' | ' + notes : ''}` });
+  } catch (e) {
+    setSyncStatus('err', 'Save failed');
+    showMsg('mcnd-msg', 'Failed to save. Check your connection and try again.', 'err');
+    setBtn('btn-condemn', false);
+    return;
+  }
 
-    inst.status = 'Condemned';
+  inst.status = 'Condemned';
 
+  // Step 2: save audit
+  const auditOk = await saveAuditRobust({ Timestamp: localTimestamp(), Event: 'Instrument condemned', Type: inst.type, SN: inst.sn, Staff: staff, Notes: `Reason: ${reason}${notes ? ' | ' + notes : ''}` });
+
+  document.getElementById('mcnd-staff').value = '';
+  document.getElementById('mcnd-notes').value = '';
+  document.getElementById('mcnd-type').value  = '';
+  document.getElementById('mcnd-sn').innerHTML = '<option value="">Select SN...</option>';
+
+  if (!auditOk) {
+    setSyncStatus('err', 'Audit write failed');
+    showMsg('mcnd-msg', `${sn} condemned but ⚠ AUDIT TRAIL WRITE FAILED. Please inform your supervisor and note manually: ${inst.type} ${sn} condemned | Staff: ${staff} | ${localTimestamp().slice(0, 10)}`, 'err');
+  } else {
     setSyncStatus('ok', 'Saved · ' + fmtTime());
     showMsg('mcnd-msg', `${sn} has been permanently retired and marked as Condemned.`, 'ok');
-    document.getElementById('mcnd-staff').value = '';
-    document.getElementById('mcnd-notes').value = '';
-    document.getElementById('mcnd-type').value  = '';
-    document.getElementById('mcnd-sn').innerHTML = '<option value="">Select SN...</option>';
-  } catch (e) {
-    inst.status = prevStatus;
-    setSyncStatus('err', 'Save failed');
-    showMsg('mcnd-msg', 'Failed to save. Check your connection.', 'err');
   }
   setBtn('btn-condemn', false);
 }
