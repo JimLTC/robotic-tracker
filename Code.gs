@@ -109,6 +109,19 @@ function getAll() {
 function saveInstrument(body) {
   var sheet = getSheet(SHEETS.instruments);
   ensureHeaders(sheet, HEADERS.instruments);
+
+  // Layer 3 duplicate-case guard — only active when logUse passes EnforceNoDuplicate
+  if (body.EnforceNoDuplicate && body.LastCase) {
+    var existingRow = findRowBySN(sheet, body.SN);
+    if (existingRow > 0) {
+      var lcIdx = HEADERS.instruments.indexOf('LastCase');
+      var currentLastCase = String(sheet.getRange(existingRow, lcIdx + 1).getValue() || '');
+      if (currentLastCase && currentLastCase === String(body.LastCase)) {
+        return { error: 'DUPLICATE_CASE', message: 'Already logged for case ' + body.LastCase };
+      }
+    }
+  }
+
   var row = [
     body.SN       || '',
     body.Type     || '',

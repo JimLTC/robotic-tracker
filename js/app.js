@@ -484,7 +484,11 @@ function checkLogUseSameCase() {
   if (!sn || !cas) return;
   const inst = state.instruments.find(i => i.sn === sn);
   if (inst && inst.lastCase && inst.lastCase === cas) {
-    showMsg('log-msg', `⚠ ${sn} has already been logged for case "${cas}" and has not been Undo'd. Use "Undo a logged use" below if this was logged in error.`, 'warn');
+    const proceed = confirm(`⚠ Possible duplicate\n\n${sn} was already logged for case "${cas}".\n\nAre you sure you want to log it again?`);
+    if (!proceed) {
+      document.getElementById('log-sn').value  = '';
+      document.getElementById('log-qty').value = '1';
+    }
   }
 }
 
@@ -585,24 +589,48 @@ async function logUse() {
     return;
   }
 
-  const newUsesLeft = inst.usesLeft !== null ? Math.max(0, inst.usesLeft - qty) : null;
-  const newStatus   = newUsesLeft === 0 ? 'Complete' : inst.status;
-
   setBtn('btn-log-use', true);
   try {
-    await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: newStatus, UsesLeft: newUsesLeft, MaxLife: inst.maxLife, LastUsed: date, LastCase: cas, Remarks: inst.remarks });
-    const auditNote = `Case: ${cas}${qty > 1 ? ` | Qty: ${qty}` : ''} | Uses left: ${newUsesLeft !== null ? newUsesLeft : 'N/A'}`;
-    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Use logged', Type: inst.type, SN: inst.sn, Staff: staff, Notes: auditNote });
+    // Layer 2: refresh from sheet to catch cross-device duplicates before writing
+    const freshData = await api({ action: 'getAll' });
+    state.instruments = (freshData.instruments || []).map(normaliseInstrument);
+    populateSNDropdown();
 
-    // Update local state only after successful write
-    inst.usesLeft = newUsesLeft;
-    inst.lastUsed = date;
-    inst.lastCase = cas;
-    inst.status   = newStatus;
+    const freshInst = state.instruments.find(i => i.sn === sn);
+    if (!freshInst) { showMsg('log-msg', 'Instrument not found after refresh.', 'err'); setBtn('btn-log-use', false); return; }
+    if (freshInst.status === 'Condemned') { showMsg('log-msg', `${sn} has been condemned and cannot be logged for use.`, 'err'); setBtn('btn-log-use', false); return; }
+    if (freshInst.lastCase && freshInst.lastCase === cas) {
+      showMsg('log-msg', `Duplicate blocked: ${sn} is already logged for case "${cas}". If this was logged from another device, use "Undo a logged use" to correct it.`, 'err');
+      setBtn('btn-log-use', false);
+      return;
+    }
+    if (freshInst.usesLeft !== null && freshInst.usesLeft <= 0) { showMsg('log-msg', 'No uses remaining.', 'err'); setBtn('btn-log-use', false); return; }
+    if (freshInst.usesLeft !== null && qty > freshInst.usesLeft) { showMsg('log-msg', `Only ${freshInst.usesLeft} use(s) remaining — cannot log ${qty}.`, 'err'); setBtn('btn-log-use', false); return; }
+
+    const newUsesLeft = freshInst.usesLeft !== null ? Math.max(0, freshInst.usesLeft - qty) : null;
+    const newStatus   = newUsesLeft === 0 ? 'Complete' : freshInst.status;
+
+    // Layer 3: backend enforces duplicate check as final hard stop
+    const saveRes = await api({ action: 'saveInstrument', SN: freshInst.sn, Type: freshInst.type, Status: newStatus, UsesLeft: newUsesLeft, MaxLife: freshInst.maxLife, LastUsed: date, LastCase: cas, Remarks: freshInst.remarks, EnforceNoDuplicate: true });
+    if (saveRes && saveRes.error) {
+      showMsg('log-msg', saveRes.error === 'DUPLICATE_CASE'
+        ? `Duplicate blocked by server: ${sn} is already logged for case "${cas}".`
+        : 'Save rejected: ' + saveRes.error, 'err');
+      setBtn('btn-log-use', false);
+      return;
+    }
+
+    const auditNote = `Case: ${cas}${qty > 1 ? ` | Qty: ${qty}` : ''} | Uses left: ${newUsesLeft !== null ? newUsesLeft : 'N/A'}`;
+    await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Use logged', Type: freshInst.type, SN: freshInst.sn, Staff: staff, Notes: auditNote });
+
+    freshInst.usesLeft = newUsesLeft;
+    freshInst.lastUsed = date;
+    freshInst.lastCase = cas;
+    freshInst.status   = newStatus;
 
     setSyncStatus('ok', 'Saved · ' + fmtTime());
-    if (inst.usesLeft !== null && inst.usesLeft <= 2) {
-      showMsg('log-msg', `Recorded. ⚠ Warning: ${inst.usesLeft} use(s) remaining — consider replacement.`, 'warn');
+    if (freshInst.usesLeft !== null && freshInst.usesLeft <= 2) {
+      showMsg('log-msg', `Recorded. ⚠ Warning: ${freshInst.usesLeft} use(s) remaining — consider replacement.`, 'warn');
     } else {
       showMsg('log-msg', `Use recorded for ${sn}.`, 'ok');
     }
