@@ -42,6 +42,8 @@ async function api(params) {
     method: 'POST',
     body: JSON.stringify(params),
     headers: { 'Content-Type': 'text/plain' },
+    redirect: 'follow',
+    credentials: 'omit',
   });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return res.json();
