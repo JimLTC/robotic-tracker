@@ -609,6 +609,7 @@ async function logUse() {
 
   const inst = state.instruments.find(i => i.sn === sn);
   if (!inst) { showMsg('log-msg', 'Instrument not found.', 'err'); return; }
+  if (inst.status === 'Condemned') { showMsg('log-msg', `${sn} has been condemned and cannot be logged for use.`, 'err'); return; }
   if (inst.usesLeft !== null && inst.usesLeft <= 0) { showMsg('log-msg', 'No uses remaining.', 'err'); return; }
   if (inst.usesLeft !== null && qty > inst.usesLeft) { showMsg('log-msg', `Only ${inst.usesLeft} use(s) remaining — cannot log ${qty}.`, 'err'); return; }
   if (inst.lastCase && inst.lastCase === cas) {
@@ -683,19 +684,42 @@ async function logFault() {
 
   state.faults.unshift({ ID: id, Date: date, Type: type, SN: sn, Kind: kind, Notes: notes, Staff: staff });
 
-  // Step 2: save audit
+  // Step 1b: automatically condemn the instrument
+  const inst = state.instruments.find(i => i.sn === sn);
+  let condemnOk = !inst || inst.status === 'Condemned';
+  if (inst && inst.status !== 'Condemned') {
+    try {
+      await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: 'Condemned', UsesLeft: inst.usesLeft, MaxLife: inst.maxLife, LastUsed: inst.lastUsed, LastCase: inst.lastCase, Remarks: inst.remarks });
+      inst.status = 'Condemned';
+      condemnOk = true;
+    } catch (e) {
+      setSyncStatus('err', 'Condemnation save failed');
+    }
+  }
+
+  // Step 2: save audit for the fault
   const auditOk = await saveAuditRobust({ Timestamp: localTimestamp(), Event: 'Fault logged', Type: type, SN: sn, Staff: staff, Notes: `${kind}: ${notes}` });
+
+  // Step 2b: save audit for the automatic condemnation
+  if (condemnOk && inst) {
+    await saveAuditRobust({ Timestamp: localTimestamp(), Event: 'Instrument condemned', Type: type, SN: sn, Staff: staff, Notes: `Auto-condemned on fault: ${kind}` });
+  }
 
   document.getElementById('fault-notes').value = '';
   document.getElementById('fault-staff').value = '';
   updateFaultsBadge();
+  populateSNDropdown();
+  if (currentSection === 'dashboard') renderDashboard();
 
   if (!auditOk) {
     setSyncStatus('err', 'Audit write failed');
     showMsg('fault-msg', `⚠ AUDIT TRAIL WRITE FAILED — fault was recorded but this event was NOT added to the audit trail. Please inform your supervisor and note manually: ${type} ${sn} | ${kind} | Staff: ${staff || '—'} | ${localTimestamp().slice(0, 10)}`, 'err');
+  } else if (!condemnOk) {
+    setSyncStatus('warn', 'Saved · ' + fmtTime());
+    showMsg('fault-msg', `⚠ Fault recorded, but ${sn} could not be condemned automatically — please condemn it manually in Instruments.`, 'warn');
   } else {
     setSyncStatus('ok', 'Saved · ' + fmtTime());
-    showMsg('fault-msg', 'Fault recorded.', 'ok');
+    showMsg('fault-msg', `Fault recorded. ${sn} has been condemned and removed from service.`, 'ok');
   }
   setBtn('btn-log-fault', false);
 }
