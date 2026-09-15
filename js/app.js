@@ -577,6 +577,7 @@ async function logUse() {
 
   const inst = state.instruments.find(i => i.sn === sn);
   if (!inst) { showMsg('log-msg', 'Instrument not found.', 'err'); return; }
+  if (inst.status === 'Condemned') { showMsg('log-msg', `${sn} has been condemned and cannot be logged for use.`, 'err'); return; }
   if (inst.usesLeft !== null && inst.usesLeft <= 0) { showMsg('log-msg', 'No uses remaining.', 'err'); return; }
   if (inst.usesLeft !== null && qty > inst.usesLeft) { showMsg('log-msg', `Only ${inst.usesLeft} use(s) remaining — cannot log ${qty}.`, 'err'); return; }
   if (inst.lastCase && inst.lastCase === cas) {
@@ -624,19 +625,28 @@ async function logFault() {
 
   if (!type || !sn || !kind || !date) { showMsg('fault-msg', 'Please fill in type, SN, fault type and date.', 'err'); return; }
 
+  const inst = state.instruments.find(i => i.sn === sn);
+
   setBtn('btn-log-fault', true);
   try {
     const id = 'f' + Date.now();
     await api({ action: 'saveFault', ID: id, Date: date, Type: type, SN: sn, Kind: kind, Notes: notes, Staff: staff });
     await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Fault logged', Type: type, SN: sn, Staff: staff, Notes: `${kind}: ${notes}` });
 
+    if (inst) {
+      await api({ action: 'saveInstrument', SN: inst.sn, Type: inst.type, Status: 'Condemned', UsesLeft: inst.usesLeft, MaxLife: inst.maxLife, LastUsed: inst.lastUsed, LastCase: inst.lastCase, Remarks: inst.remarks });
+      await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Instrument condemned', Type: inst.type, SN: inst.sn, Staff: staff, Notes: `Auto-condemned on fault — ${kind}${notes ? ': ' + notes : ''}` });
+      inst.status = 'Condemned';
+    }
+
     state.faults.unshift({ ID: id, Date: date, Type: type, SN: sn, Kind: kind, Notes: notes, Staff: staff });
 
     setSyncStatus('ok', 'Saved · ' + fmtTime());
-    showMsg('fault-msg', 'Fault recorded.', 'ok');
+    showMsg('fault-msg', `Fault recorded. ${sn} has been condemned and removed from circulation.`, 'warn');
     document.getElementById('fault-notes').value = '';
     document.getElementById('fault-staff').value = '';
     updateFaultsBadge();
+    if (currentSection === 'dashboard') renderDashboard();
   } catch (e) {
     setSyncStatus('err', 'Save failed');
     showMsg('fault-msg', 'Failed to save. Check your connection.', 'err');
@@ -719,10 +729,11 @@ function populateCondemnSN() {
 }
 
 function populateStatusChangeSN() {
-  const t = document.getElementById('mstatus-type').value;
-  const list = state.instruments.filter(i => i.type === t && i.status !== 'Condemned');
+  const t  = document.getElementById('mstatus-type').value;
+  const fs = document.getElementById('mstatus-filter').value;
+  const list = state.instruments.filter(i => i.type === t && (!fs || i.status === fs));
   document.getElementById('mstatus-sn').innerHTML = '<option value="">Select SN...</option>' +
-    list.map(i => `<option value="${i.sn}">${i.sn} — currently ${i.status}</option>`).join('');
+    list.map(i => `<option value="${i.sn}">${i.sn} — ${i.status}</option>`).join('');
 }
 
 async function changeInstrumentStatus() {

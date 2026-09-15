@@ -331,6 +331,20 @@
                 <select id="mstatus-type" onchange="populateStatusChangeSN()"><option value="">Select type...</option></select>
               </div>
               <div class="fg">
+                <label>Filter by current status</label>
+                <select id="mstatus-filter" onchange="populateStatusChangeSN()">
+                  <option value="">All statuses</option>
+                  <option>Circulation</option>
+                  <option>SB Instrument</option>
+                  <option>URO Set</option>
+                  <option>Non-sterile</option>
+                  <option>Complete</option>
+                  <option>Condemned</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-grid" style="margin-top:0">
+              <div class="fg">
                 <label>Serial number</label>
                 <select id="mstatus-sn"><option value="">Select SN...</option></select>
               </div>
