@@ -374,7 +374,63 @@
           </div>
         </div>
 
-        <!-- Panel 4: Retire / condemn instrument -->
+        <!-- Panel 2: Add new instrument -->
+        <div class="panel">
+          <div class="ph"><h2>Add new instrument</h2></div>
+          <div class="pb">
+            <div class="form-grid">
+              <div class="fg">
+                <label>Serial number</label>
+                <input type="text" id="mnew-sn" placeholder="e.g. K14260123-0271">
+              </div>
+              <div class="fg">
+                <label>Instrument type</label>
+                <select id="mnew-type">
+                  <option value="">Select type...</option>
+                  <option>Scope Arm</option>
+                  <option>Camera Head</option>
+                  <option>Light Cable</option>
+                  <option>Vessel Sealer</option>
+                  <option>Stapler</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="fg">
+                <label>Initial status</label>
+                <select id="mnew-status">
+                  <option value="">Select status...</option>
+                  <option>Circulation</option>
+                  <option>SB Instrument</option>
+                  <option>URO Set</option>
+                  <option>Non-sterile</option>
+                </select>
+              </div>
+              <div class="fg">
+                <label>Max life (uses)</label>
+                <input type="number" id="mnew-maxlife" placeholder="Leave blank if unlimited" min="1">
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="fg">
+                <label>Uses left (defaults to max life)</label>
+                <input type="number" id="mnew-usesleft" placeholder="Leave blank to match max life" min="0">
+              </div>
+              <div class="fg">
+                <label>Added by</label>
+                <input type="text" id="mnew-staff" placeholder="Staff name / ID">
+              </div>
+            </div>
+            <div class="fg" style="margin-bottom:14px">
+              <label>Remarks (optional)</label>
+              <input type="text" id="mnew-remarks" placeholder="e.g. New stock from vendor">
+            </div>
+            <button class="btn primary" id="btn-add-instr" onclick="addInstrument()">Add instrument</button>
+            <div id="mnew-msg"></div>
+          </div>
+        </div>
+
+        <!-- Panel 3: Retire / condemn instrument -->
         <div class="panel" style="border-color:#3d1515">
           <div class="ph" style="border-color:#3d1515">
             <h2 style="color:var(--red)">⚑ Retire / condemn instrument — this action is permanent</h2>
