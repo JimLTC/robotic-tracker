@@ -380,6 +380,8 @@ function applyDashPanelState() {
 
 // ── All Instruments ───────────────────────────────────────────────────────────
 
+const STATUS_ORDER = ['Circulation', 'SB Instrument', 'URO Set', 'Non-sterile', 'Complete', 'Condemned'];
+
 function renderInstruments() {
   const types = [...new Set(state.instruments.map(i => i.type))].sort();
   const td = document.getElementById('filt-type');
@@ -393,23 +395,69 @@ function renderInstruments() {
     (!ft || i.type === ft) && (!fs || i.status === fs) && (showComplete || fs === 'Complete' || i.status !== 'Complete')
   );
 
-  document.getElementById('instr-table').innerHTML = list.length === 0
-    ? '<tr><td colspan="6" class="empty">No instruments found</td></tr>'
-    : list.map(i => {
-        const p = i.maxLife !== null ? Math.round(i.usesLeft / i.maxLife * 100) : null;
-        const bar = p !== null
-          ? `<div class="lw"><div class="lb"><div class="lf" style="width:${p}%;background:${bc(p)}"></div></div><span class="ll" style="color:${bc(p)}">${i.usesLeft}/${i.maxLife}</span></div>`
-          : `<span style="color:var(--text3);font-size:12px">By session</span>`;
-        return `
-        <tr>
-          <td class="mono">${i.sn}</td>
-          <td>${i.type}</td>
-          <td>${sbadge(i.status)}</td>
-          <td>${bar}</td>
-          <td style="color:var(--text2);font-size:12px">${i.lastUsed ? i.lastUsed.slice(0, 10) : '—'}</td>
-          <td style="color:var(--text2);font-size:12px;max-width:200px">${i.remarks || '—'}</td>
-        </tr>`;
-      }).join('');
+  if (list.length === 0) {
+    document.getElementById('instr-table').innerHTML = '<tr><td colspan="6" class="empty">No instruments found</td></tr>';
+    return;
+  }
+
+  function rowHtml(i) {
+    const p = i.maxLife !== null ? Math.round(i.usesLeft / i.maxLife * 100) : null;
+    const bar = p !== null
+      ? `<div class="lw"><div class="lb"><div class="lf" style="width:${p}%;background:${bc(p)}"></div></div><span class="ll" style="color:${bc(p)}">${i.usesLeft}/${i.maxLife}</span></div>`
+      : `<span style="color:var(--text3);font-size:12px">By session</span>`;
+    return `<tr>
+      <td class="mono">${i.sn}</td>
+      <td>${i.type}</td>
+      <td>${sbadge(i.status)}</td>
+      <td>${bar}</td>
+      <td style="color:var(--text2);font-size:12px">${i.lastUsed ? i.lastUsed.slice(0, 10) : '—'}</td>
+      <td style="color:var(--text2);font-size:12px;max-width:200px">${i.remarks || '—'}</td>
+    </tr>`;
+  }
+
+  function typeHeader(label) {
+    return `<tr><th colspan="6" style="background:var(--accent);color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:6px 10px">${label}</th></tr>`;
+  }
+
+  function statusHeader(label) {
+    return `<tr><th colspan="6" style="background:var(--bg2);color:var(--text3);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:5px 10px 5px 20px">↳ ${label}</th></tr>`;
+  }
+
+  let html = '';
+
+  if (!ft) {
+    // All types: group by type, then by status within each type
+    const byType = {};
+    list.forEach(i => {
+      if (!byType[i.type]) byType[i.type] = {};
+      if (!byType[i.type][i.status]) byType[i.type][i.status] = [];
+      byType[i.type][i.status].push(i);
+    });
+    Object.keys(byType).sort().forEach(type => {
+      html += typeHeader(type);
+      STATUS_ORDER.forEach(status => {
+        const rows = byType[type][status];
+        if (!rows) return;
+        html += statusHeader(status);
+        html += rows.map(rowHtml).join('');
+      });
+    });
+  } else {
+    // Type filtered: group by status only
+    const byStatus = {};
+    list.forEach(i => {
+      if (!byStatus[i.status]) byStatus[i.status] = [];
+      byStatus[i.status].push(i);
+    });
+    STATUS_ORDER.forEach(status => {
+      const rows = byStatus[status];
+      if (!rows) return;
+      html += statusHeader(status);
+      html += rows.map(rowHtml).join('');
+    });
+  }
+
+  document.getElementById('instr-table').innerHTML = html;
 }
 
 // ── Consumables ───────────────────────────────────────────────────────────────
