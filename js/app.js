@@ -775,14 +775,16 @@ async function undoUse() {
 // ── Instrument management forms ───────────────────────────────────────────────
 
 function initManageForms() {
-  const typeNames = Object.keys(INSTRUMENT_TYPES);
-  const typeOpts  = '<option value="">Select type...</option>' + typeNames.map(t => `<option>${t}</option>`).join('');
-  document.getElementById('mcnd-type').innerHTML = typeOpts;
-  document.getElementById('mcnd-sn').innerHTML   = '<option value="">Select SN...</option>';
+  const allTypes        = [...new Set(state.instruments.map(i => i.type))].sort();
+  const activeTypes     = [...new Set(state.instruments.filter(i => i.status !== 'Condemned').map(i => i.type))].sort();
+  const allTypeOpts     = '<option value="">Select type...</option>' + allTypes.map(t => `<option>${t}</option>`).join('');
+  const activeTypeOpts  = '<option value="">Select type...</option>' + activeTypes.map(t => `<option>${t}</option>`).join('');
 
-  const allTypes = [...new Set(state.instruments.filter(i => i.status !== 'Condemned').map(i => i.type))].sort();
-  document.getElementById('mstatus-type').innerHTML = '<option value="">Select type...</option>' + allTypes.map(t => `<option>${t}</option>`).join('');
+  document.getElementById('mcnd-type').innerHTML    = activeTypeOpts;
+  document.getElementById('mcnd-sn').innerHTML      = '<option value="">Select SN...</option>';
+  document.getElementById('mstatus-type').innerHTML = activeTypeOpts;
   document.getElementById('mstatus-sn').innerHTML   = '<option value="">Select SN...</option>';
+  document.getElementById('mnew-type').innerHTML    = allTypeOpts;
 }
 
 function autoFillMaxLife() {
