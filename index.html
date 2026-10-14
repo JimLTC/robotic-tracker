@@ -491,8 +491,14 @@
         <div class="filter-row">
           <select id="afilt-event" onchange="renderAudit()"><option value="">All events</option></select>
           <select id="afilt-type" onchange="renderAudit()"><option value="">All types</option></select>
-          <input type="date" id="afilt-from" onchange="renderAudit()" title="From date">
-          <input type="date" id="afilt-to" onchange="renderAudit()" title="To date">
+        </div>
+        <div class="filter-row" style="margin-top:4px">
+          <span style="font-size:11px;color:var(--text3);white-space:nowrap">Logged (timestamp):</span>
+          <input type="date" id="afilt-from" onchange="renderAudit()" title="Logged from">
+          <input type="date" id="afilt-to" onchange="renderAudit()" title="Logged to">
+          <span style="font-size:11px;color:var(--text3);white-space:nowrap">Case/use date:</span>
+          <input type="date" id="afilt-edate-from" onchange="renderAudit()" title="Case/use date from">
+          <input type="date" id="afilt-edate-to" onchange="renderAudit()" title="Case/use date to">
           <button class="btn sm" onclick="clearAuditFilters()">Clear filters</button>
         </div>
         <div class="panel table-wrap">
@@ -500,6 +506,7 @@
             <thead>
               <tr>
                 <th>Timestamp</th>
+                <th>Case/Use date</th>
                 <th>Event</th>
                 <th>Type</th>
                 <th>SN</th>
