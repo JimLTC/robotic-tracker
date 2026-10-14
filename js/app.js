@@ -566,10 +566,34 @@ function populateConsumableSNDropdown() {
 
   const isSureForm = type.toLowerCase().includes('sureform');
   document.getElementById('clog-reload-section').style.display = isSureForm ? '' : 'none';
-  if (!isSureForm) {
-    document.getElementById('clog-reload-color').value = '';
-    document.getElementById('clog-reload-qty').value   = '1';
+  if (isSureForm) {
+    document.getElementById('clog-reload-rows').innerHTML = '';
+    addReloadRow();
   }
+}
+
+function addReloadRow() {
+  const row = document.createElement('div');
+  row.className = 'reload-row';
+  row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px';
+  row.innerHTML = `
+    <select class="reload-color" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text1);font-size:13px">
+      <option value="">Select colour...</option>
+      <option value="Green">Green</option>
+      <option value="Blue">Blue</option>
+      <option value="Black">Black</option>
+    </select>
+    <input type="number" class="reload-qty" min="1" value="1"
+      style="width:70px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text1);font-size:13px">
+    <button type="button" onclick="removeReloadRow(this)"
+      style="padding:4px 8px;font-size:13px;background:none;border:1px solid var(--border);border-radius:4px;color:var(--red);cursor:pointer;line-height:1">✕</button>`;
+  document.getElementById('clog-reload-rows').appendChild(row);
+}
+
+function removeReloadRow(btn) {
+  const rows = document.getElementById('clog-reload-rows').querySelectorAll('.reload-row');
+  if (rows.length <= 1) return;
+  btn.closest('.reload-row').remove();
 }
 
 async function logConsumableUse() {
@@ -579,12 +603,18 @@ async function logConsumableUse() {
   const cas   = document.getElementById('clog-case').value.trim();
   const staff = document.getElementById('clog-staff').value;
 
-  const isSureForm    = type.toLowerCase().includes('sureform');
-  const reloadColor   = isSureForm ? document.getElementById('clog-reload-color').value : '';
-  const reloadQty     = isSureForm ? Math.max(1, parseInt(document.getElementById('clog-reload-qty').value) || 1) : null;
+  const isSureForm = type.toLowerCase().includes('sureform');
+  let reloads = [];
+  if (isSureForm) {
+    document.getElementById('clog-reload-rows').querySelectorAll('.reload-row').forEach(row => {
+      const color = row.querySelector('.reload-color').value;
+      const qty   = Math.max(1, parseInt(row.querySelector('.reload-qty').value) || 1);
+      reloads.push({ color, qty });
+    });
+  }
 
   if (!type || !sn || !date || !cas) { showMsg('clog-msg', 'Please fill in type, SN, date and case.', 'err'); return; }
-  if (isSureForm && !reloadColor) { showMsg('clog-msg', 'Please select a reload colour.', 'err'); return; }
+  if (isSureForm && reloads.some(r => !r.color)) { showMsg('clog-msg', 'Please select a colour for every reload row.', 'err'); return; }
 
   const cons = state.consumables.find(c => c.sn === sn);
   if (!cons) { showMsg('clog-msg', 'Consumable not found.', 'err'); return; }
@@ -595,7 +625,8 @@ async function logConsumableUse() {
   setBtn('btn-log-cons-use', true);
   try {
     await api({ action: 'saveConsumable', SN: cons.sn, Type: cons.type, Balance: newBalance, MaxBalance: cons.maxBalance, Expiry: cons.expiry, LastUsed: date });
-    const auditNotes = `Case: ${cas} | Balance: ${newBalance}/${cons.maxBalance}${isSureForm ? ` | Reload: ${reloadColor} ×${reloadQty}` : ''}`;
+    const reloadStr  = isSureForm ? ' | Reloads: ' + reloads.map(r => `${r.color} ×${r.qty}`).join(', ') : '';
+    const auditNotes = `Case: ${cas} | Balance: ${newBalance}/${cons.maxBalance}${reloadStr}`;
     await api({ action: 'saveAudit', Timestamp: localTimestamp(), Event: 'Consumable use logged', Type: cons.type, SN: cons.sn, Staff: staff, Notes: auditNotes });
 
     cons.balance  = newBalance;
