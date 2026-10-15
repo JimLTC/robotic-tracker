@@ -17,7 +17,7 @@ var HEADERS = {
   instruments: ['SN', 'Type', 'Status', 'UsesLeft', 'MaxLife', 'LastUsed', 'LastCase', 'Remarks'],
   consumables: ['SN', 'Type', 'Balance', 'MaxBalance', 'Expiry', 'LastUsed'],
   faults:      ['ID', 'Date', 'Type', 'SN', 'Kind', 'Notes', 'Staff'],
-  audit:       ['Timestamp', 'Event', 'Type', 'SN', 'Staff', 'Notes'],
+  audit:       ['Timestamp', 'EventDate', 'Event', 'Type', 'SN', 'Staff', 'Notes'],
 };
 
 // ── CORS helper ───────────────────────────────────────────────────────────────
@@ -181,6 +181,7 @@ function saveAudit(body) {
   ensureHeaders(sheet, HEADERS.audit);
   sheet.appendRow([
     body.Timestamp || '',
+    body.EventDate || '',
     body.Event     || '',
     body.Type      || '',
     body.SN        || '',

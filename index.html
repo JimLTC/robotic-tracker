@@ -250,21 +250,8 @@
             </div>
             <div id="clog-reload-section" style="display:none;margin-bottom:14px;padding:12px;background:var(--surface2);border-radius:6px">
               <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Reload details</div>
-              <div class="form-grid">
-                <div class="fg">
-                  <label>Reload colour</label>
-                  <select id="clog-reload-color">
-                    <option value="">Select colour...</option>
-                    <option value="Green">Green</option>
-                    <option value="Blue">Blue</option>
-                    <option value="Black">Black</option>
-                  </select>
-                </div>
-                <div class="fg">
-                  <label>Reloads used</label>
-                  <input type="number" id="clog-reload-qty" min="1" value="1" style="width:80px">
-                </div>
-              </div>
+              <div id="clog-reload-rows"></div>
+              <button type="button" onclick="addReloadRow()" style="margin-top:4px;padding:4px 12px;font-size:12px;background:none;border:1px dashed var(--border);border-radius:4px;color:var(--accent);cursor:pointer">＋ Add reload</button>
             </div>
             <button class="btn primary" id="btn-log-cons-use" onclick="logConsumableUse()">Record consumable use</button>
             <div id="clog-msg"></div>
@@ -504,8 +491,14 @@
         <div class="filter-row">
           <select id="afilt-event" onchange="renderAudit()"><option value="">All events</option></select>
           <select id="afilt-type" onchange="renderAudit()"><option value="">All types</option></select>
-          <input type="date" id="afilt-from" onchange="renderAudit()" title="From date">
-          <input type="date" id="afilt-to" onchange="renderAudit()" title="To date">
+        </div>
+        <div class="filter-row" style="margin-top:4px">
+          <span style="font-size:11px;color:var(--text3);white-space:nowrap">Logged (timestamp):</span>
+          <input type="date" id="afilt-from" onchange="renderAudit()" title="Logged from">
+          <input type="date" id="afilt-to" onchange="renderAudit()" title="Logged to">
+          <span style="font-size:11px;color:var(--text3);white-space:nowrap">Case/use date:</span>
+          <input type="date" id="afilt-edate-from" onchange="renderAudit()" title="Case/use date from">
+          <input type="date" id="afilt-edate-to" onchange="renderAudit()" title="Case/use date to">
           <button class="btn sm" onclick="clearAuditFilters()">Clear filters</button>
         </div>
         <div class="panel table-wrap">
@@ -513,6 +506,7 @@
             <thead>
               <tr>
                 <th>Timestamp</th>
+                <th>Case/Use date</th>
                 <th>Event</th>
                 <th>Type</th>
                 <th>SN</th>
