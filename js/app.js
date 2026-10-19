@@ -230,6 +230,15 @@ function parseSheetDate(str) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
+// Converts any timestamp from Sheets to local "YYYY-MM-DD HH:MM:SS"
+function parseSheetTimestamp(str) {
+  if (!str) return '';
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return str.toString().slice(0, 19).replace('T', ' ');
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
 function bc(p) {
   return p <= 20 ? 'var(--red)' : p <= 40 ? 'var(--amber)' : 'var(--green)';
 }
@@ -1037,8 +1046,8 @@ function filteredAuditRows() {
   return [...state.audit].reverse().filter(r => {
     const event  = r.Event     || r.event     || '';
     const type   = r.Type      || r.type      || '';
-    const day    = (r.Timestamp || r.timestamp || '').toString().slice(0, 10);
-    const edate  = (r.EventDate || r.eventdate || '').toString().slice(0, 10);
+    const day    = parseSheetDate(r.Timestamp || r.timestamp || '');
+    const edate  = parseSheetDate(r.EventDate || r.eventdate || '');
     return (!fe || event === fe)
         && (!ft || type === ft)
         && (!from || day >= from)
@@ -1075,10 +1084,10 @@ function renderAudit() {
     ? '<tr><td colspan="7" class="empty">No events found</td></tr>'
     : rows.map(r => {
         const event  = r.Event     || r.event     || '';
-        const edate  = (r.EventDate || r.eventdate || '').toString().slice(0, 10);
+        const edate  = parseSheetDate(r.EventDate || r.eventdate || '');
         return `
         <tr>
-          <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">${(r.Timestamp || r.timestamp || '').toString().slice(0, 19).replace('T', ' ')}</td>
+          <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">${parseSheetTimestamp(r.Timestamp || r.timestamp || '')}</td>
           <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">${edate || '—'}</td>
           <td><span class="badge ${auditBadgeClass(event)}">${event}</span></td>
           <td style="font-size:12px">${r.Type  || r.type  || ''}</td>
